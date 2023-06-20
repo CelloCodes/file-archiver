@@ -1,0 +1,34 @@
+como devem ser coletadas, armazenadas e apresentadas as permissoes dos membros
+do arquivo
+    coletadas com stat
+    armazenadas no modelo do ls -l "-rw-------"
+
+diferenca na manipulacao do conteudo: estrutura pode ser manipulada em RAM,
+porem binario so pode ser manipulado atraves de um buffer de 1024 bytes
+(so e permitido ter ate 1024 bytes de binario na memoria RAM em qualquer
+dado momento)
+    correto
+
+qual a finalidade do buffer?
+    evitar alocacao de quantidades indevidas de memoria
+
+qual a diferenca entre typedef struct e apenas struct
+    estilo do programador
+
+no comando -c, listar em ordem se refere a ordem de inclusao no archive?
+    sim
+
+a estrutura pode conter posicao em bytes dos membros?
+    contem
+
+o nome e o caminho para cada membro deve ser armazenado separadamente na
+estrutura? se sim, arquivos com o mesmo nome mas em diretorios diferentes
+devem ser considerados o mesmo arquivo ou o caminho para o arquivo influencia?
+    nome se refere ao nome completo, com caminho para o arquivo incluso
+    localizacao se refere a posicao do binario do arquivo dentro do archive
+
+se os nomes deve ser armazenados sem espaco, como devem ser representados?
+
+como deve ser representada a data de modificacao do arquivo?
+
+programa deve poder aceitar um diretorio ao inves da lista de membros?
