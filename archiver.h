@@ -1,25 +1,26 @@
 #ifndef ARCHIVER_H_
 #define ARCHIVER_H_
 
+#include "avl.h"
+
+// ideia: escrever os nodos da arvore em pre ordem
+// dessa forma, quando forem lidos do arquivo
+// nenhuma rotacao sera necessaria pois serao colocados
+// na sua posicao ja calculada
+
 typedef struct {
     unsigned int numMembers;
 
-    // ideia: primeiro char de cada nome ser o tamanho do nome
-    // dessa forma le-se o tamanho do nome, aloca-se espaco para ele
-    // e entao le-se o nome, cujo tamanho ja e conhecido
-    // O tamanho+1 deve ser alocado devido ao caractere nulo ao final
-    char** memberNames;
-
-    unsigned short* memberPermissions;
-
-    unsigned int* memberPositions;
-    unsigned int* memberSizes;
-    unsigned int* memberUIDs;
-
-    unsigned long* memberModDates;
+    treeNode_t* memberTree;
 
 } archive_t;
 
-archive_t* loadArchive ( FILE* src );
+archive_t* allocateArchive ( );
+
+int loadArchive ( FILE* src, archive_t* a );
+
+void printArchive ( archive_t* a );
+
+void freeArchive ( archive_t* a );
 
 #endif

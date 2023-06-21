@@ -5,6 +5,8 @@
 #include <unistd.h>
 #include <errno.h>
 
+#include "archiver.h"
+
 #define BUFFER_SIZE 1024
 
 //
@@ -105,110 +107,105 @@ void updateAllMembers( int argc, char** argv )
     char* filename = argv[optind];
     FILE* arq = fopen(filename, "r+");
     if (! arq) {
-        fprintf(stderr, "Falha ao abrir o arquivo '%s' para leitura e escrita\n", filename);
-        exit(2);
+        if (errno == EACCES) {
+            fprintf(stderr, "Falha ao abrir o arquivo '%s' para leitura e escrita\n", filename);
+            fprintf(stderr, "\tSem permissao para acessar o caminho/arquivo descrito\n");
+            exit(2);
+
+        } else if (errno == ENOENT) {
+            arq = fopen(filename, "w");
+        }
     }
+
+    if (! arq) {
+        if (errno == EACCES) {
+            fprintf(stderr, "Falha ao abrir o arquivo '%s' para escrita\n", filename);
+            fprintf(stderr, "\tSem permissao para acessar o caminho/arquivo descrito\n");
+            exit(2);
+
+        } else if (errno == ENOENT) {
+            fprintf(stderr, "\tDiretorio ou arquivo inexistente no caminho descrito\n");
+            exit (2);
+        }
+    }
+
+
 
     fclose(arq);
 }
 
 void updateNewMembers ( int argc, char** argv )
 {
-    char* filename = argv[optind];
-    FILE* arq = fopen(filename, "r+");
-    if (! arq) {
-        fprintf(stderr, "Falha ao abrir o arquivo '%s' para leitura e escrita\n", filename);
-        exit(2);
-    }
-
-    fclose(arq);
+    return;
 }
 
 // optarg is in argv[0]
 void moveMember ( int argc, char** argv )
 {
-    char* filename = argv[optind];
-    FILE* arq = fopen(filename, "r+");
-    if (! arq) {
-        fprintf(stderr, "Falha ao abrir o arquivo '%s' para leitura e escrita\n", filename);
-        exit(2);
-    }
-
-    fclose(arq);
+    return;
 }
 
 void extractMembers ( int argc, char** argv )
 {
-    char* filename = argv[optind];
-    FILE* arq = fopen(filename, "r+");
-    if (! arq) {
-        fprintf(stderr, "Falha ao abrir o arquivo '%s' para leitura e escrita\n", filename);
-        exit(2);
-    }
-
-    fclose(arq);
+    return;
 }
 
 void removeMembers ( int argc, char** argv )
 {
-    char* filename = argv[optind];
-    FILE* arq = fopen(filename, "r+");
-    if (! arq) {
-        fprintf(stderr, "Falha ao abrir o arquivo '%s' para leitura e escrita\n", filename);
-        exit(2);
-    }
-
-    fclose(arq);
+    return;
 }
 
 void listMembers( int argc, char** argv )
 {
     char* filename = argv[optind];
-    //struct stat* s = malloc(sizeof(struct stat));
 
-    //if(! s) {
-    //    fprintf(stderr, "Falha ao alocar memoria dinamica\n");
-    //    free(s);
-    //    exit(3);
+    // captura das caracteristicas de um arquivo
+    // nome, uid, data de modificacao, permissoes
+    // caminho ja esta incluso no filename
+    //struct stat s;
+    //if(stat(filename, &s) == -1) {
+    //    fprintf(stderr, "Falha ao ler metadados do arquivo '%s'\n", filename);
+    //    exit(2);
+    //}else{
+    //    printf("Nome do arquivo-----------------: %s\n", filename);
+    //    printf("ID do usuario criador do arquivo: %d\n", s.st_uid);
+    //    printf("Data de modificacao do arquivo--: %09ld\n", s.st_mtim.tv_sec);
+    //    printf("Permissoes do arquivo-----------: %d\n", s.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO));
     //}
-
-    struct stat s;
-    
-    if(stat(filename, &s) == -1) {
-        fprintf(stderr, "Falha ao ler metadados do arquivo '%s'\n", filename);
-        //exit(2);
-    }else{
-        printf("Nome do arquivo-----------------: %s\n", filename);
-        printf("ID do usuario criador do arquivo: %d\n", s.st_uid);
-        printf("Data de modificacao do arquivo--: %09ld\n", s.st_mtim.tv_sec);
-        printf("Modo do arquivo-----------------: %d\n", s.st_mode);
-        printf("Permissoes do arquivo-----------: %d\n", s.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO));
-    }
 
     //system("echo funciona");
 
-
-    FILE* arq = fopen(filename, "r+");
+    FILE* arq = fopen(filename, "r");
     if (! arq) {
-        fprintf(stderr, "Falha ao abrir o arquivo '%s' para leitura e escrita\n", filename);
+        fprintf(stderr, "Falha ao abrir o arquivo '%s' para leitura\n", filename);
         if (errno == EACCES)
-            fprintf(stderr, "\tSem permissao\n");
+            fprintf(stderr, "\tSem permissao para acessar o caminho/arquivo descrito\n");
         else if (errno == ENOENT)
-            fprintf(stderr, "\tDiretorio ou arquivo inexistente\n");
+            fprintf(stderr, "\tDiretorio ou arquivo inexistente no caminho descrito\n");
         
         exit(2);
     }
 
-    printf("Abriu o arquivo com sucesso\n");
+    archive_t* archive = allocateArchive();
+    if (! archive) {
+        fprintf(stderr, "Falha de alocacao de memoria dinamica\n");
+        fclose(arq);
+        exit(1);
+    }
 
-    //tipo* archive;
-    //archive = readArchive(arq);
-    //if (archive == NULL) {
-    //    fprintf(stderr, "Falha ao ler arquivo %s\n", argv[1]);
-    //    return;
-    //}
+    int error;
+    error = loadArchive (arq, archive);
+    if (error != 0) {
+        fprintf(stderr, "Falha ao ler dados do arquivo '%s'\n", filename);
+        fclose(arq);
+        freeArchive(archive);
+        exit(3);
+    }
+
+    printArchive(archive); 
 
     fclose(arq);
+    freeArchive(archive);
 }
 
 void help ( )
