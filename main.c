@@ -161,19 +161,6 @@ void listMembers( int argc, char** argv )
 {
     char* filename = argv[optind];
 
-    // captura das caracteristicas de um arquivo
-    // nome, uid, data de modificacao, permissoes
-    // caminho ja esta incluso no filename
-    //struct stat s;
-    //if(stat(filename, &s) == -1) {
-    //    fprintf(stderr, "Falha ao ler metadados do arquivo '%s'\n", filename);
-    //    exit(2);
-    //}else{
-    //    printf("Nome do arquivo-----------------: %s\n", filename);
-    //    printf("ID do usuario criador do arquivo: %d\n", s.st_uid);
-    //    printf("Data de modificacao do arquivo--: %09ld\n", s.st_mtim.tv_sec);
-    //    printf("Permissoes do arquivo-----------: %d\n", s.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO));
-    //}
 
     //system("echo funciona");
 

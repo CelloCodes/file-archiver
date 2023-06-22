@@ -16,9 +16,9 @@ struct memberData_t {
 
     unsigned int position;
     unsigned int order;
-    unsigned int size;
     unsigned int UID;
 
+    unsigned long size;
     unsigned long modDate;
 
     memberData_t* previousInOrder;
