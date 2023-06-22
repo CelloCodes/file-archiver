@@ -253,7 +253,7 @@ void rLR ( treeNode_t** root, treeNode_t* p ) {
     }
 }
 
-void atualizarBalancoInsercao ( treeNode_t** root, treeNode_t* n ) {
+void updateBalanceInsertion ( treeNode_t** root, treeNode_t* n ) {
     treeNode_t* p = n->father;
 
     if (n == p->leftSon)
@@ -330,13 +330,13 @@ treeNode_t* treeInsert ( treeNode_t** root, memberData_t* key ) {
                 father->rightSon = n;
             }
         }
-        atualizarBalancoInsercao(root, n);
+        updateBalanceInsertion(root, n);
     }
 
     return n;
 }
 
-void atualizarBalancoRemocao ( treeNode_t** root, treeNode_t* p ) {
+void updateBalanceRemove ( treeNode_t** root, treeNode_t* p ) {
     if (! p)
         return;
 
@@ -479,7 +479,7 @@ int treeRemove ( treeNode_t** root, memberData_t* key ) {
             *root = y;
     }
 
-    atualizarBalancoRemocao(root, nodoBalanco);
+    updateBalanceRemove(root, nodoBalanco);
 
     free(z);
 

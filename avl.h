@@ -1,7 +1,9 @@
 #ifndef AVL_H_
 #define AVL_H_
 
-typedef struct {
+typedef struct memberData_t memberData_t;
+
+struct memberData_t {
     // ideia: primeiro byte de cada nome ser o tamanho do nome
     // dessa forma le-se o tamanho do nome, aloca-se espaco para ele
     // e entao le-se o nome, cujo tamanho ja e conhecido
@@ -19,16 +21,20 @@ typedef struct {
 
     unsigned long modDate;
 
-} memberData_t;
+    memberData_t* previousInOrder;
+    memberData_t* nextInOrder;
 
+};
 
-typedef struct treeNode_t {
+typedef struct treeNode_t treeNode_t;
+
+struct treeNode_t {
     memberData_t* key;
     char balance;
-    struct treeNode_t* father;
-    struct treeNode_t* leftSon;
-    struct treeNode_t* rightSon;
-} treeNode_t;
+    treeNode_t* father;
+    treeNode_t* leftSon;
+    treeNode_t* rightSon;
+};
 
 //retorna NULL se não foi possível inserir
 treeNode_t* treeInsert ( treeNode_t** raiz, memberData_t* chave );

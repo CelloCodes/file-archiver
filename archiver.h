@@ -13,6 +13,9 @@ typedef struct {
 
     treeNode_t* memberTree;
 
+    memberData_t* firstInOrder;
+    memberData_t* lastInOrder;
+
 } archive_t;
 
 archive_t* allocateArchive ( );

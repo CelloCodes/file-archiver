@@ -28,17 +28,28 @@ devem ser considerados o mesmo arquivo ou o caminho para o arquivo influencia?
     localizacao se refere a posicao do binario do arquivo dentro do archive
 
 se os nomes deve ser armazenados sem espaco, como devem ser representados?
+    substituir os espacos na hora de armazenar o nome e representar da forma
+    substituida
+    substituir tambem na hora de comparar nomes, lidar apenas com nomes sem
+    espaco
 
 o programa deve considerar a passagem de nomes com caracteres especiais
+    desconsiderar passagem de nomes com caracteres especiais
 
 como deve ser representada a data de modificacao do arquivo?
+    trivial
 
 programa deve poder aceitar um diretorio ao inves da lista de membros?
+    desconsiderar passagem de diretorio
 
 exit() ou tratar as estruturas alocadas?
+    pode ser ignorada
 
 o programa espera o .vpp sempre no diretorio onde esta sendo executado ou
-pode ser passado um diretorio diferete? se for passado um caminho diferente
+pode ser passado um diretorio diferente? se for passado um caminho diferente
 o programa deve apenas criar o arquivo no caminho especificado e acusar erro
 caso nao seja capaz (seja por permissao ou por algum diretorio do caminho nao
 existir)?
+    fazer da forma imaginada
+
+resize_file ou copiar todos os dados menos os que serao excluidos

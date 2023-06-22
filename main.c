@@ -129,7 +129,9 @@ void updateAllMembers( int argc, char** argv )
         }
     }
 
-
+    for (unsigned int index = optind+1; index < argc; index++);
+        // chamar e testar funcao para inserir arquivo apontado
+        // pelo nome argv[index]
 
     fclose(arq);
 }
