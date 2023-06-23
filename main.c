@@ -173,6 +173,7 @@ void updateAllMembers( int argc, char** argv )
         error = insertMember(src, arq, argv[index], archive);
         fclose(src);
         if (error != 0) {
+            fprintf(stderr, "Erro ao inserir membro no archive\n");
             freeArchive(archive);
             fclose(arq);
 

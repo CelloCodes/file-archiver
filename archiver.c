@@ -31,22 +31,46 @@ void freeArchive ( archive_t* a )
     free(a);
 }
 
-memberData_t* allocateMember ( unsigned short sizeofName, char* name )
+memberData_t* allocateMember ( unsigned short* sizeofName, char* name )
 {
     memberData_t* m = malloc(sizeof(memberData_t));
     if (! m)
         return NULL;
 
-    m->name = malloc(sizeof(char) * sizeofName);
+    short nameFix = 2;
+    if ((*sizeofName) >= 1) {
+        if (name[0] == '.') {
+            if (name[1] == '/')
+                nameFix = 0;
+            else if ((*sizeofName > 2) && (name[1] == '.') && (name[2] == '/'))
+                nameFix = -1;
+        } else if (name[0] == '/') {
+            nameFix = 1;
+        }
+    }
+
+    (*sizeofName) += nameFix;
+    m->name = malloc(sizeof(char) * (*sizeofName));
     if (! m->name) {
         free(m);
         return NULL;
     }
 
-    for (unsigned short i = 0; i < sizeofName; i++)
-        m->name[i] = name[i];
+    short nNameFix = 0;
+    if (nameFix == 2) {
+        m->name[0] = '.';
+        m->name[1] = '/';
+    } else if (nameFix == 1) {
+        m->name[0] = '.';
+    } else if (nameFix == -1) {
+        nameFix = 0;
+        nNameFix = 1;
+    }
 
-    m->sizeofName = sizeofName;
+    for (unsigned short i = 0; i < (*sizeofName) - nameFix; i++)
+        m->name[i + nameFix] = name[i + nNameFix];
+
+    m->sizeofName = (*sizeofName);
     m->previousInOrder = NULL;
     m->nextInOrder = NULL;
 
@@ -358,14 +382,14 @@ void adjustPositions ( memberData_t* start, long sizeDiff )
 
 int insertMember ( FILE* src, FILE* dest, char* srcName, archive_t* a )
 {
-    int nameSize = 0;
+    unsigned short nameSize = 0;
     for (; srcName[nameSize] != '\0'; nameSize++);
     nameSize++;
 
-    if (nameSize >= 255)
+    if (nameSize >= 253)
         return 3;
 
-    memberData_t* member = allocateMember((unsigned short) nameSize, srcName);
+    memberData_t* member = allocateMember(&nameSize, srcName);
     if (! member)
         return 2;
 
