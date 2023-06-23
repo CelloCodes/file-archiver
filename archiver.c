@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <limits.h>
 
 #include "archiver.h"
 
@@ -67,11 +68,12 @@ void fillMemberStat ( memberData_t* m, struct stat* s )
     m->modDate     = s->st_mtim.tv_sec;
 }
 
-unsigned int getFirstFreeByte ( archive_t* a )
+int getFirstFreeByte ( archive_t* a )
 {
     if (a->lastInOrder)
         return (a->lastInOrder->position + a->lastInOrder->size);
-    return 0;
+
+    return sizeof(int);
 }
 
 int readMemberData ( FILE* src, memberData_t *m )
@@ -83,13 +85,16 @@ int readMemberData ( FILE* src, memberData_t *m )
     if (! m->name)
         return 0;
 
-    if (fread(m->name, m->sizeofName, 1, src) != 1)
+    if (fread(m->name, sizeof(char) * m->sizeofName, 1, src) != 1)
         return 0;
 
     if (fread(&(m->permission), sizeof(m->permission), 1, src) != 1)
         return 0;
 
     if (fread(&(m->order), sizeof(m->order), 1, src) != 1)
+        return 0;
+
+    if (fread(&(m->position), sizeof(m->position), 1, src) != 1)
         return 0;
 
     if (fread(&(m->size), sizeof(m->size), 1, src) != 1)
@@ -115,10 +120,17 @@ void insertInOrder ( archive_t* a, memberData_t* m )
         a->lastInOrder = m;
 
     } else if (! aux->nextInOrder) {
-        aux->nextInOrder = m;
-        m->previousInOrder = aux;
+        if (aux->order < m->order) {
+            aux->nextInOrder = m;
+            m->previousInOrder = aux;
 
-        a->lastInOrder = m;
+            a->lastInOrder = m;
+        } else {
+            aux->previousInOrder = m;
+            m->nextInOrder = aux;
+            
+            a->firstInOrder = m;
+        }
 
     } else {
         if (aux->previousInOrder) {
@@ -133,8 +145,6 @@ void insertInOrder ( archive_t* a, memberData_t* m )
             a->firstInOrder = m;
         }
     }
-
-    a->numMembers++;
 }
 
 int loadArchive ( FILE* src, archive_t* a )
@@ -145,25 +155,29 @@ int loadArchive ( FILE* src, archive_t* a )
     if (fread(&posArchive, sizeof(posArchive), 1, src) != 1)
         return 1;
 
-    fseek(src, posArchive, SEEK_SET);
+    if (fseek(src, posArchive, SEEK_SET) == -1)
+        return 1;
+
     if (fread(&(a->numMembers), sizeof(a->numMembers), 1, src) != 1)
         return 1;
 
     memberData_t* member;
-    for (unsigned int i = 0; i < a->numMembers; a++) {
+    for (long i = 0; i < a->numMembers; i++) {
         member = malloc(sizeof(memberData_t));
         if (! member)
             return 2;
 
-        if (! readMemberData(src, member)) {
+        member->name = NULL;
+        member->nextInOrder = NULL;
+        member->previousInOrder = NULL;
+        int erro = readMemberData(src, member);
+        if (! erro) {
             freeMember(member);
-            freeTree(a->memberTree);
             return 2;
         }
 
         if (! treeInsert(&(a->memberTree), member)) {
             freeMember(member);
-            freeTree(a->memberTree);
             return 2;
         }
 
@@ -215,7 +229,7 @@ int pasteBinary (FILE* src, FILE* dest, unsigned long start, unsigned long bytes
     return 1;
 }
 
-int adjustRight ( FILE* dest, long stop, unsigned long bytes)
+int adjustBinaryRight ( FILE* dest, long stop, unsigned long bytes )
 {
     if (fseek(dest, 0, SEEK_END) == -1)
         return 0;
@@ -236,28 +250,17 @@ int adjustRight ( FILE* dest, long stop, unsigned long bytes)
             return 0;
         }
 
-        if (fread(buffer, BUFFER_SIZE, 1, dest) != 1) {
-            free(buffer);
-            return 0;
-        }
-
-        if (fseek(dest, bytes, curPos) == -1) {
-            free(buffer);
-            return 0;
-        }
-
-        if (fwrite(buffer, BUFFER_SIZE, 1, dest) != 1) {
-            free(buffer);
-            return 0;
-        }
-
-        if (fseek(dest, - bytes - BUFFER_SIZE, curPos) == -1) {
-            free(buffer);
-            return 0;
-        }
-
         curPos = ftell(dest);
         if (curPos < 0) {
+            free(buffer);
+            return 0;
+        }
+
+        if (    (fread(buffer, BUFFER_SIZE, 1, dest) != 1)  || 
+                (fseek(dest, bytes, curPos) == -1)          ||
+                (fwrite(buffer, BUFFER_SIZE, 1, dest) != 1) ||
+                (fseek(dest, 0, curPos) == -1)              ){
+
             free(buffer);
             return 0;
         }
@@ -265,22 +268,11 @@ int adjustRight ( FILE* dest, long stop, unsigned long bytes)
 
     if (curPos > stop) {
         long toRead = curPos - stop;
-        if (fseek(dest, stop - curPos, curPos) == -1) {
-            free(buffer);
-            return 0;
-        }
+        if (    (fseek(dest, stop, SEEK_SET) == -1)         ||
+                (fread(buffer, toRead, 1, dest) != 1)       ||
+                (fseek(dest, stop + bytes, SEEK_SET) == -1) ||
+                (fwrite(buffer, toRead, 1, dest) != 1)      ){
 
-        if (fread(buffer, toRead, 1, dest) != 1) {
-            free(buffer);
-            return 0;
-        }
-
-        if (fseek(dest, curPos - toRead + bytes, curPos) == -1) {
-            free(buffer);
-            return 0;
-        }
-
-        if (fwrite(buffer, toRead, 1, dest) != 1) {
             free(buffer);
             return 0;
         }
@@ -289,47 +281,34 @@ int adjustRight ( FILE* dest, long stop, unsigned long bytes)
     free(buffer);
 
     return 1;
-
 }
 
-// adaptar
-int adjustRight ( FILE* dest, long stop, unsigned long bytes)
+int adjustBinaryLeft ( FILE* dest, long start, unsigned long bytes)
 {
     if (fseek(dest, 0, SEEK_END) == -1)
+        return 0;
+
+    long stop = ftell(dest);
+    if (stop < 0)
+        return 0;
+
+    if (fseek(dest, start, SEEK_SET) == -1)
+        return 0;
+
+    long curPos = ftell(dest);
+    if (curPos < 0)
         return 0;
 
     void* buffer = malloc(BUFFER_SIZE);
     if (! buffer)
         return 0;
 
-    long curPos = ftell(dest);
-    if (curPos < 0) {
-        free(buffer);
-        return 0;
-    }
+    while ((curPos + BUFFER_SIZE) < stop) {
+        if (    (fread(buffer, BUFFER_SIZE, 1, dest) != 1)  || 
+                (fseek(dest, -bytes, curPos) == -1)         ||
+                (fwrite(buffer, BUFFER_SIZE, 1, dest) != 1) ||
+                (fseek(dest, bytes, SEEK_CUR) == -1)        ){
 
-    while ((curPos - BUFFER_SIZE) >= stop) {
-        if (fseek(dest, -BUFFER_SIZE, curPos) == -1) {
-            free(buffer);
-            return 0;
-        }
-
-        if (fread(buffer, BUFFER_SIZE, 1, dest) != 1) {
-            free(buffer);
-            return 0;
-        }
-
-        if (fseek(dest, bytes, curPos) == -1) {
-            free(buffer);
-            return 0;
-        }
-
-        if (fwrite(buffer, BUFFER_SIZE, 1, dest) != 1) {
-            free(buffer);
-            return 0;
-        }
-
-        if (fseek(dest, - bytes - BUFFER_SIZE, curPos) == -1) {
             free(buffer);
             return 0;
         }
@@ -341,24 +320,12 @@ int adjustRight ( FILE* dest, long stop, unsigned long bytes)
         }
     }
 
-    if (curPos > stop) {
-        long toRead = curPos - stop;
-        if (fseek(dest, stop - curPos, curPos) == -1) {
-            free(buffer);
-            return 0;
-        }
+    if (curPos - stop) {
+        long toRead = stop - curPos;
+        if (    (fread(buffer, toRead, 1, dest) != 1)       ||
+                (fseek(dest, -bytes, curPos) == -1)         ||
+                (fwrite(buffer, toRead, 1, dest) != 1)      ){
 
-        if (fread(buffer, toRead, 1, dest) != 1) {
-            free(buffer);
-            return 0;
-        }
-
-        if (fseek(dest, curPos - toRead + bytes, curPos) == -1) {
-            free(buffer);
-            return 0;
-        }
-
-        if (fwrite(buffer, toRead, 1, dest) != 1) {
             free(buffer);
             return 0;
         }
@@ -367,21 +334,26 @@ int adjustRight ( FILE* dest, long stop, unsigned long bytes)
     free(buffer);
 
     return 1;
-
 }
 
-// verifica se o membro esta contido no archive
-// se estiver executa processo 1
-// se nao estiver insere ao final
+void adjustPositions ( memberData_t* start, long sizeDiff )
+{
+    while (start) {
+        start->position += sizeDiff;
+        start = start->nextInOrder;
+    }
+}
+
 int insertMember ( FILE* src, FILE* dest, char* srcName, archive_t* a )
 {
-    unsigned int nameSize = 0;
+    int nameSize = 0;
     for (; srcName[nameSize] != '\0'; nameSize++);
+    nameSize++;
 
     if (nameSize >= 255)
         return 3;
 
-    memberData_t* member = allocateMember(nameSize, srcName);
+    memberData_t* member = allocateMember((unsigned short) nameSize, srcName);
     if (! member)
         return 2;
 
@@ -394,22 +366,31 @@ int insertMember ( FILE* src, FILE* dest, char* srcName, archive_t* a )
     fillMemberStat(member, &s);
     member->order = a->numMembers;
 
-    unsigned int pastePosition;
+    long pastePosition;
     long sizeDiff;
     treeNode_t* tn = treeSearch(a->memberTree, member);
     if (tn) {
         memberData_t* oldMember = tn->key;
         sizeDiff = s.st_size - oldMember->size;
 
+        if (oldMember->modDate == member->modDate) {
+            freeMember(member);
+            return 0;
+        }
+
         if (sizeDiff > 0) {
-            if (! adjustRight(dest, (long) (oldMember->position + oldMember->size), sizeDiff)) {
+            if (! adjustBinaryRight(dest, oldMember->position + oldMember->size, sizeDiff)) {
                 freeMember(member);
                 return 5;
+            } else {
+                adjustPositions(oldMember->nextInOrder, sizeDiff) ;
             }
         } else if (sizeDiff < 0) {
-            if (! adjustLeft(dest, oldMember->position + oldMember->size, sizeDiff)) {
+            if (! adjustBinaryLeft(dest, oldMember->position + oldMember->size, sizeDiff)) {
                 freeMember(member);
                 return 5;
+            } else {
+                adjustPositions(oldMember->nextInOrder, sizeDiff) ;
             }
         }
 
@@ -431,6 +412,8 @@ int insertMember ( FILE* src, FILE* dest, char* srcName, archive_t* a )
         member->position = pastePosition;
 
         insertInOrder(a, member);
+
+        a->numMembers++;
     }
 
     if (! pasteBinary(src, dest, pastePosition, s.st_size))
@@ -448,7 +431,33 @@ int updateMember ( FILE* src, FILE* dest, char* srcName, archive_t* a )
     return 0;
 }
 
+int writeArchive ( FILE* dest, archive_t* a )
+{
+    if (fseek(dest, 0, SEEK_SET) == -1)
+        return 0;
+
+    int pos = getFirstFreeByte(a);
+    if (fwrite(&pos, sizeof(int), 1, dest) != 1)
+        return 0;
+
+    long numNodes = 0;
+    if (a->lastInOrder)
+        numNodes = a->lastInOrder->order + 1;
+
+    return treeWriteBFS(dest, a->memberTree, numNodes, pos);
+}
+
 void printArchive ( archive_t* a )
 {
-    return;
+    printf("Numero de Membros: %ld\n", a->numMembers);
+
+    memberData_t* m = a->firstInOrder;
+    while (m) {
+        printf("Membro %2ld: %s\n", m->order, m->name);
+        printf("\tUID----------------: %d\n", m->UID);
+        printf("\tPermissoes---------: %d\n", m->permission);
+        printf("\tTamanho------------: %ld\n", m->size);
+        printf("\tData de Modificacao: %ld\n", m->modDate);
+        m = m->nextInOrder;
+    }
 }

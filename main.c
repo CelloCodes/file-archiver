@@ -102,38 +102,94 @@ void optCountVerify(char* optCount) {
     (*optCount)++;
 }
 
+void exitFail ( char* message, int code )
+{
+    fprintf(stderr, "%s\n", message);
+    exit(code);
+}
+
+void treatError ( int code )
+{
+    fprintf(stderr, "Erro %d\n", code);
+    exit(1);
+}
+
 void updateAllMembers( int argc, char** argv )
 {
+    int error;
+
+    archive_t* archive = allocateArchive();
+    if (! archive)
+        exitFail("Falha de alocacao de memoria dinamica", 1);
+
     char* filename = argv[optind];
     FILE* arq = fopen(filename, "r+");
     if (! arq) {
         if (errno == EACCES) {
             fprintf(stderr, "Falha ao abrir o arquivo '%s' para leitura e escrita\n", filename);
-            fprintf(stderr, "\tSem permissao para acessar o caminho/arquivo descrito\n");
-            exit(2);
+            freeArchive(archive);
+
+            exitFail("\tSem permissao para acessar o caminho/arquivo descrito", 2);
 
         } else if (errno == ENOENT) {
             arq = fopen(filename, "w");
         }
-    }
+    } else {
+        error = loadArchive (arq, archive);
+        if (error != 0) {
+            fclose(arq);
+            freeArchive(archive);
 
-    if (! arq) {
-        if (errno == EACCES) {
-            fprintf(stderr, "Falha ao abrir o arquivo '%s' para escrita\n", filename);
-            fprintf(stderr, "\tSem permissao para acessar o caminho/arquivo descrito\n");
-            exit(2);
-
-        } else if (errno == ENOENT) {
-            fprintf(stderr, "\tDiretorio ou arquivo inexistente no caminho descrito\n");
-            exit (2);
+            fprintf(stderr, "Falha ao ler dados do arquivo '%s'\n", filename);
+            exit(3);
         }
     }
 
-    for (unsigned int index = optind+1; index < argc; index++);
-        // chamar e testar funcao para inserir arquivo apontado
-        // pelo nome argv[index]
+    if (! arq) {
+        fprintf(stderr, "Falha ao abrir o arquivo '%s' para escrita\n", filename);
+        freeArchive(archive);
 
+        if (errno == EACCES) 
+            exitFail("\tSem permissao para acessar o caminho/arquivo descrito\n", 2);
+        else if (errno == ENOENT)
+            exitFail("\tDiretorio ou arquivo inexistente no caminho descrito\n", 4);
+    }
+
+    FILE* src;
+    for (unsigned int index = optind+1; index < argc; index++) {
+        src = fopen(argv[index], "r");
+        if (! src) {
+            fprintf(stderr, "Falha ao abrir o arquivo '%s' para leitura\n", argv[index]);
+            if (errno == EACCES)
+                fprintf(stderr, "\tSem permissao para acessar o caminho/arquivo descrito\n");
+            else if (errno == ENOENT)
+                fprintf(stderr, "\tDiretorio ou arquivo inexistente no caminho descrito\n");
+
+            freeArchive(archive);
+            fclose(arq);
+            exit(2);
+        }
+
+        error = insertMember(src, arq, argv[index], archive);
+        fclose(src);
+        if (error != 0) {
+            freeArchive(archive);
+            fclose(arq);
+
+            treatError(error);
+        }
+
+    }
+
+    error = writeArchive(arq, archive);
+
+    printf("tentou escrever\n");
+
+    freeArchive(archive);
     fclose(arq);
+
+    if (error != 0)
+        treatError(error);
 }
 
 void updateNewMembers ( int argc, char** argv )
@@ -160,11 +216,7 @@ void removeMembers ( int argc, char** argv )
 void listMembers( int argc, char** argv )
 {
     char* filename = argv[optind];
-
-
-    //system("echo funciona");
-
-    FILE* arq = fopen(filename, "r");
+    FILE* arq = fopen(filename, "r+");
     if (! arq) {
         fprintf(stderr, "Falha ao abrir o arquivo '%s' para leitura\n", filename);
         if (errno == EACCES)
@@ -177,9 +229,8 @@ void listMembers( int argc, char** argv )
 
     archive_t* archive = allocateArchive();
     if (! archive) {
-        fprintf(stderr, "Falha de alocacao de memoria dinamica\n");
         fclose(arq);
-        exit(1);
+        exitFail("Falha de alocacao de memoria dinamica", 1);
     }
 
     int error;

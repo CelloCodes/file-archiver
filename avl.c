@@ -516,44 +516,85 @@ size_t height ( treeNode_t* n )
     return i;
 }
 
-void treePrintBSF ( treeNode_t* root ) {
+int treeWriteBFS ( FILE* dest, treeNode_t* root, long numNodes, int start ) {
+    printf("first free byte: %d\n", start);
+    if (fseek(dest, start, SEEK_SET) == -1)
+        return 2;
+
     if (! root)
-        return;
+        return 1;
 
     struct fila *f = criaFila();
     if (! f)
-        return;
+        return 1;
 
-    if ((enfileirar(f, root->leftSon) == 0) || (enfileirar(f, root->rightSon) == 0)) {
-        fprintf(stderr, "Falha da alocacao de memoria dinamica\n");
+    if (fwrite(&numNodes, sizeof(numNodes), 1, dest) != 1) {
         destroiFila(f);
-        return;
+        return 2;
+    }
+    
+    if (enfileirar(f, root) == 0) {
+        destroiFila(f);
+        return 1;
     }
 
-    //printf("[%ld] %d(%d)", height(root), root->key, (int) root->balance);
 
     treeNode_t *n;
-    size_t alt = height(root);
-    size_t nAlt = alt;
+    memberData_t* m;
     while (filaVazia(f) == 0) {
         n = desenfileirar(f); 
         if (n){
-            nAlt = height(n);
-            if (nAlt != alt) {
-                alt = nAlt;
-                printf("\n[%ld]", alt);
+            m = n->key;
+            if (fwrite(&(m->sizeofName), sizeof(m->sizeofName), 1, dest) != 1) {
+                destroiFila(f);
+                return 2;
             }
-            //printf(" %d(%d)", n->key, (int) n->balance);
+
+            if (fwrite(m->name, m->sizeofName, 1, dest) != 1) {
+                destroiFila(f);
+                return 2;
+            }
+
+            if (fwrite(&(m->permission), sizeof(m->permission), 1, dest) != 1) {
+                destroiFila(f);
+                return 2;
+            }
+
+            if (fwrite(&(m->order), sizeof(m->order), 1, dest) != 1) {
+                destroiFila(f);
+                return 2;
+            }
+
+            if (fwrite(&(m->position), sizeof(m->position), 1, dest) != 1) {
+                destroiFila(f);
+                return 2;
+            }
+
+            if (fwrite(&(m->size), sizeof(m->size), 1, dest) != 1) {
+                destroiFila(f);
+                return 2;
+            }
+
+            if (fwrite(&(m->UID), sizeof(m->UID), 1, dest) != 1) {
+                destroiFila(f);
+                return 2;
+            }
+
+            if (fwrite(&(m->modDate), sizeof(m->modDate), 1, dest) != 1) {
+                destroiFila(f);
+                return 2;
+            }
 
             if ((enfileirar(f, n->leftSon) == 0) || (enfileirar(f, n->rightSon) == 0)) {
-                fprintf(stderr, "Falha da alocacao de memoria dinamica\n");
                 destroiFila(f);
-                return;
+                return 1;
             }
         }
     }
 
     destroiFila(f);
+
+    return 0;
 }
 
 treeNode_t* freeTree ( treeNode_t* n )

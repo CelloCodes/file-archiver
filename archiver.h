@@ -9,7 +9,7 @@
 // na sua posicao ja calculada
 
 typedef struct {
-    unsigned int numMembers;
+    long numMembers;
 
     treeNode_t* memberTree;
 
@@ -21,6 +21,10 @@ typedef struct {
 archive_t* allocateArchive ( );
 
 int loadArchive ( FILE* src, archive_t* a );
+
+int insertMember ( FILE* src, FILE* dest, char* srcName, archive_t* a );
+
+int writeArchive ( FILE* dest, archive_t* a );
 
 void printArchive ( archive_t* a );
 

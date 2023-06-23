@@ -14,11 +14,11 @@ struct memberData_t {
 
     unsigned short permission;
 
-    unsigned int position;
-    unsigned int order;
-    unsigned int UID;
+    long position;
+    long order;
+    int UID;
 
-    unsigned long size;
+    long size;
     unsigned long modDate;
 
     memberData_t* previousInOrder;
@@ -37,17 +37,17 @@ struct treeNode_t {
 };
 
 //retorna NULL se não foi possível inserir
-treeNode_t* treeInsert ( treeNode_t** raiz, memberData_t* chave );
+treeNode_t* treeInsert ( treeNode_t** root, memberData_t* chave );
 
 //retorna 1 caso removido, ou 0 caso não seja possível remover
-int treeRemove ( treeNode_t** raiz, memberData_t* chave );
+int treeRemove ( treeNode_t** root, memberData_t* chave );
 
 //retorna NULL se não existe
-treeNode_t* treeSearch ( treeNode_t* nodo, memberData_t* chave );
+treeNode_t* treeSearch ( treeNode_t* node, memberData_t* chave );
 
-void treePrintDFS ( treeNode_t* nodo );
+void treePrintDFS ( treeNode_t* node );
 
-void treePrintBFS( treeNode_t* raiz );
+int treeWriteBFS( FILE* dest, treeNode_t* root, long numNodes, int start );
 
 //retorna NULL e desaloca a memoria da arvore
 treeNode_t* freeTree ( treeNode_t* n );
