@@ -517,7 +517,6 @@ size_t height ( treeNode_t* n )
 }
 
 int treeWriteBFS ( FILE* dest, treeNode_t* root, long numNodes, int start ) {
-    printf("first free byte: %d\n", start);
     if (fseek(dest, start, SEEK_SET) == -1)
         return 2;
 

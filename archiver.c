@@ -3,6 +3,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <limits.h>
+#include <time.h>
 
 #include "archiver.h"
 
@@ -126,16 +127,27 @@ void insertInOrder ( archive_t* a, memberData_t* m )
 
             a->lastInOrder = m;
         } else {
-            aux->previousInOrder = m;
-            m->nextInOrder = aux;
-            
-            a->firstInOrder = m;
+            if (aux->previousInOrder) {
+                m->previousInOrder = aux->previousInOrder;
+                m->previousInOrder->nextInOrder = m;
+
+                m->nextInOrder = aux;
+                aux->previousInOrder = m;
+
+            } else {
+                aux->previousInOrder = m;
+                m->nextInOrder = aux;
+
+                a->firstInOrder = m;
+            }
         }
 
     } else {
         if (aux->previousInOrder) {
             m->previousInOrder = aux->previousInOrder;
             m->previousInOrder->nextInOrder = m;
+
+            m->nextInOrder = aux;
             aux->previousInOrder = m;
 
         } else {
@@ -449,15 +461,34 @@ int writeArchive ( FILE* dest, archive_t* a )
 
 void printArchive ( archive_t* a )
 {
+    printf("-/-/-/-/-/-/-/-/--/-/-/-/-/-/-/-/-/-/-/-/-/-/\n");
     printf("Numero de Membros: %ld\n", a->numMembers);
+    printf("-/-/-/-/-/-/-/-/--/-/-/-/-/-/-/-/-/-/-/-/-/-/\n");
 
     memberData_t* m = a->firstInOrder;
+
+    char perm[10];
+    perm[9] = '\0';
+    char empty[] = {'-', '-', '-', '-', '-', '-', '-', '-', '-'};
+    char full[] = {'r', 'w', 'x', 'r', 'w', 'x', 'r', 'w', 'x'};
+    int masks[] = {S_IRUSR, S_IWUSR, S_IXUSR, S_IRGRP, S_IWGRP, S_IXGRP, S_IROTH, S_IWOTH, S_IXOTH};
+
+    char date[80];
+    struct tm ts;
+    
+    short i;
     while (m) {
+        for(i = 0; i < 9; i++)
+            (m->permission & masks[i]) ? (perm[i] = full[i]) : (perm[i] = empty[i]);
+        ts = *localtime(&m->modDate);
+        strftime(date, sizeof(date), "%d-%m-%Y %H:%M:%S %Z", &ts);
+            
         printf("Membro %2ld: %s\n", m->order, m->name);
         printf("\tUID----------------: %d\n", m->UID);
-        printf("\tPermissoes---------: %d\n", m->permission);
-        printf("\tTamanho------------: %ld\n", m->size);
-        printf("\tData de Modificacao: %ld\n", m->modDate);
+        printf("\tPermissoes---------: %s\n", perm);
+        printf("\tTamanho------------: %ld bytes\n", m->size);
+        printf("\tData de Modificacao: %s\n", date);
+        printf("-/-/-/-/-/-/-/-/--/-/-/-/-/-/-/-/-/-/-/-/-/-/\n");
         m = m->nextInOrder;
     }
 }

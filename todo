@@ -1,4 +1,5 @@
 reimplementar loop que passar pelos argumentos livres
+    feito
 
 ordenar por nome ou por indice no arquivo?
 vantagens de ordenar por nome:
@@ -8,6 +9,7 @@ vantagens de ordenar por indice:
 ideia:
     estrutura de arvore mista, com lista ligada entre os nodos
     formando a sequencia de insercao
+    feito
 
 descobrir como funciona delecao de dados do arquivo
 (mover o ponteiro do fim do arquivo?)
@@ -86,3 +88,7 @@ sobre a remocao:
     o membro seguinte sera movido para a posicao do ponteiro do arquivo
     e o processo se repete ate que todos os membros tenham sido movidos
     para a esquerda
+
+PROXIMOS PASSOS
+    truncar o arquivo ao final da escrita do archive
+    implementar -a

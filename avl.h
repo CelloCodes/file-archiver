@@ -19,7 +19,7 @@ struct memberData_t {
     int UID;
 
     long size;
-    unsigned long modDate;
+    time_t modDate;
 
     memberData_t* previousInOrder;
     memberData_t* nextInOrder;

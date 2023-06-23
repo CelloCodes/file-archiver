@@ -183,8 +183,6 @@ void updateAllMembers( int argc, char** argv )
 
     error = writeArchive(arq, archive);
 
-    printf("tentou escrever\n");
-
     freeArchive(archive);
     fclose(arq);
 
