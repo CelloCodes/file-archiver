@@ -6,26 +6,27 @@
 #include <errno.h>
 
 #include "archiver.h"
-
 #define BUFFER_SIZE 1024
 
 //
-void updateAllMembers ( int argc, char** argv );
+void updateMembers ( int argc, char** argv,
+            int (*oper) ( FILE* src, FILE* dest, char* srcName, archive_t* a ) );
 
 //
-void updateNewMembers ( int argc, char** argv );
+void moveMember ( int argc, char** argv,
+            int (*oper) ( FILE* src, FILE* dest, char* srcName, archive_t* a ) );
 
 //
-void moveMember ( int argc, char** argv );
+void extractMembers ( int argc, char** argv,
+            int (*oper) ( FILE* src, FILE* dest, char* srcName, archive_t* a ) );
 
 //
-void extractMembers ( int argc, char** argv );
+void removeMembers ( int argc, char** argv,
+            int (*oper) ( FILE* src, FILE* dest, char* srcName, archive_t* a ) );
 
 //
-void removeMembers ( int argc, char** argv );
-
-//
-void listMembers ( int argc, char** argv );
+void listMembers ( int argc, char** argv,
+            int (*oper) ( FILE* src, FILE* dest, char* srcName, archive_t* a ) );
 
 //
 void help ( );
@@ -37,22 +38,27 @@ int main(int argc, char **argv)
 {
     int opt;
     char optCount = 0;
-    void (*fp) (int argc, char** argv);
+    void (*fp) (int argc, char** argv,
+                int (*uF) (FILE* src, FILE* dest, char* srcName, archive_t* a));
+    int (*oper) (FILE* src, FILE* dest, char* srcName, archive_t* a);
 
     if (argc <= 2) {
         fprintf(stderr, "Opcao invalida\n");
         exit(1);
     }		
 
+    oper = NULL;
     while ((opt = getopt(argc, argv, "iam:xrch")) != -1) {
         switch (opt) {
         case 'i':
-            fp = updateAllMembers;
+            fp = updateMembers;
+            oper = insertMember;
             optCountVerify(&optCount);
             break;
 
         case 'a':
-            fp = updateNewMembers;
+            fp = updateMembers;
+            oper = updateMember;
             optCountVerify(&optCount);
             break;
 
@@ -88,7 +94,7 @@ int main(int argc, char **argv)
         }		
     }
 
-    fp(argc, argv);
+    fp(argc, argv, oper);
 
     return 0;
 }
@@ -100,6 +106,18 @@ void optCountVerify(char* optCount) {
     }
 
     (*optCount)++;
+}
+
+void fileOperationFailMessage ( int err, char* filename )
+{
+    fprintf(stderr, 
+            "Falha ao abrir o arquivo '%s'\n",
+            filename);
+
+    if (errno == EACCES)
+        fprintf(stderr, "\tSem permissao para acessar o caminho/arquivo descrito\n");
+    else if (errno == ENOENT)
+        fprintf(stderr, "\tDiretorio ou arquivo inexistente no caminho descrito\n");
 }
 
 void exitFail ( char* message, int code )
@@ -114,7 +132,8 @@ void treatError ( int code )
     exit(1);
 }
 
-void updateAllMembers( int argc, char** argv )
+void updateMembers ( int argc, char** argv,
+            int (*oper) ( FILE* src, FILE* dest, char* srcName, archive_t* a ) )
 {
     int error;
 
@@ -122,18 +141,23 @@ void updateAllMembers( int argc, char** argv )
     if (! archive)
         exitFail("Falha de alocacao de memoria dinamica", 1);
 
+    // Tentando abrir o archive 
     char* filename = argv[optind];
     FILE* arq = fopen(filename, "r+");
     if (! arq) {
         if (errno == EACCES) {
-            fprintf(stderr, "Falha ao abrir o arquivo '%s' para leitura e escrita\n", filename);
+            fileOperationFailMessage(errno, filename);
             freeArchive(archive);
+            exit(2);
 
-            exitFail("\tSem permissao para acessar o caminho/arquivo descrito", 2);
-
+        // Caso a falha tenha ocorrido por motivo de nao existir algo no caminho
+        // tenta criar o arquivo, imanginando que foi passado um diretorio
+        // e o archive nao existe nele
         } else if (errno == ENOENT) {
             arq = fopen(filename, "w");
         }
+
+    // Caso nao tenha conseguido abrir, tenta carregar os dados dos membros
     } else {
         error = loadArchive (arq, archive);
         if (error != 0) {
@@ -145,33 +169,26 @@ void updateAllMembers( int argc, char** argv )
         }
     }
 
+    // Caso nao tenha conseguido abrir, e nao tenha conseguido
     if (! arq) {
-        fprintf(stderr, "Falha ao abrir o arquivo '%s' para escrita\n", filename);
         freeArchive(archive);
-
-        if (errno == EACCES) 
-            exitFail("\tSem permissao para acessar o caminho/arquivo descrito\n", 2);
-        else if (errno == ENOENT)
-            exitFail("\tDiretorio ou arquivo inexistente no caminho descrito\n", 4);
+        fileOperationFailMessage(errno, filename);
+        exit(2);
     }
 
     FILE* src;
     for (unsigned int index = optind+1; index < argc; index++) {
         src = fopen(argv[index], "r");
         if (! src) {
-            fprintf(stderr, "Falha ao abrir o arquivo '%s' para leitura\n", argv[index]);
-            if (errno == EACCES)
-                fprintf(stderr, "\tSem permissao para acessar o caminho/arquivo descrito\n");
-            else if (errno == ENOENT)
-                fprintf(stderr, "\tDiretorio ou arquivo inexistente no caminho descrito\n");
-
             freeArchive(archive);
             fclose(arq);
+            fileOperationFailMessage(errno, argv[index]);
             exit(2);
         }
 
-        error = insertMember(src, arq, argv[index], archive);
+        error = oper(src, arq, argv[index], archive);
         fclose(src);
+
         if (error != 0) {
             fprintf(stderr, "Erro ao inserir membro no archive\n");
             freeArchive(archive);
@@ -179,10 +196,10 @@ void updateAllMembers( int argc, char** argv )
 
             treatError(error);
         }
-
     }
 
     error = writeArchive(arq, archive);
+    ftruncate(fileno(arq), ftell(arq));
 
     freeArchive(archive);
     fclose(arq);
@@ -191,28 +208,27 @@ void updateAllMembers( int argc, char** argv )
         treatError(error);
 }
 
-void updateNewMembers ( int argc, char** argv )
-{
-    return;
-}
-
 // optarg is in argv[0]
-void moveMember ( int argc, char** argv )
+void moveMember ( int argc, char** argv,
+            int (*oper) ( FILE* src, FILE* dest, char* srcName, archive_t* a ) )
 {
     return;
 }
 
-void extractMembers ( int argc, char** argv )
+void extractMembers ( int argc, char** argv,
+            int (*oper) ( FILE* src, FILE* dest, char* srcName, archive_t* a ) )
 {
     return;
 }
 
-void removeMembers ( int argc, char** argv )
+void removeMembers ( int argc, char** argv,
+            int (*oper) ( FILE* src, FILE* dest, char* srcName, archive_t* a ) )
 {
     return;
 }
 
-void listMembers( int argc, char** argv )
+void listMembers( int argc, char** argv,
+            int (*oper) ( FILE* src, FILE* dest, char* srcName, archive_t* a ) )
 {
     char* filename = argv[optind];
     FILE* arq = fopen(filename, "r+");

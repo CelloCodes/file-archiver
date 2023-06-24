@@ -91,4 +91,5 @@ sobre a remocao:
 
 PROXIMOS PASSOS
     truncar o arquivo ao final da escrita do archive
-    implementar -a
+    arrumar sequencia de fread/fseek/ftell
+    lixo
