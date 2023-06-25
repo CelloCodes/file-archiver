@@ -28,6 +28,10 @@ int updateMember ( FILE* src, FILE* dest, char* srcName, archive_t* a );
 
 int moveMember ( FILE* dest, archive_t* a, char* m1Name, char* m2Name );
 
+int removeMember ( FILE* dest, archive_t* a, char* m1Name );
+
+int extractMember ( FILE* src, FILE* dest, char* name, archive_t* a );
+
 int writeArchive ( FILE* dest, archive_t* a );
 
 void printArchive ( archive_t* a );

@@ -199,9 +199,13 @@ int loadArchive ( FILE* src, archive_t* a )
 
 // no meio do caminho de uma escrita pode ocorrer erro
 // a boa pratica deve ser criar um arquivo novo para evitar corromper dados
-int pasteBinary (FILE* src, FILE* dest, unsigned long start, unsigned long bytes )
+int pasteBinary (FILE* src, FILE* dest, long srcStart, long destStart,
+                    unsigned long bytes )
 {
-    if (fseek(dest, start, SEEK_SET) == -1)
+    if (fseek(dest, destStart, SEEK_SET) == -1)
+        return 0;
+
+    if (fseek(src, srcStart, SEEK_SET) == -1)
         return 0;
 
     void* buffer = malloc(BUFFER_SIZE);
@@ -403,7 +407,7 @@ int insertMember ( FILE* src, FILE* dest, char* srcName, archive_t* a )
         a->numMembers++;
     }
 
-    if (! pasteBinary(src, dest, pastePosition, s.st_size))
+    if (! pasteBinary(src, dest, 0, pastePosition, s.st_size))
         return 5;
 
     return 0;
@@ -476,7 +480,7 @@ int updateMember ( FILE* src, FILE* dest, char* srcName, archive_t* a )
         a->numMembers++;
     }
 
-    if (! pasteBinary(src, dest, pastePosition, s.st_size))
+    if (! pasteBinary(src, dest, 0, pastePosition, s.st_size))
         return 5;
 
     return 0;
@@ -675,9 +679,67 @@ int moveMember ( FILE* dest, archive_t* a, char* m1Name, char* m2Name )
         m2->nextInOrder= m1;
     }
 
-    printArchive(a);
+    return 1;
+}
+
+int removeMember ( FILE* dest, archive_t* a, char* m1Name ) 
+{
+    memberData_t* m1 = getMember(a, m1Name);
+    memberData_t* m2 = a->lastInOrder;
+    memberData_t* mAux = NULL;
+    if ((! m1) || (! m2))
+        return 0;
+
+    if (m1->name == m2->name) {
+        a->lastInOrder = m1->previousInOrder;    
+        if (m1->previousInOrder)
+            m1->previousInOrder->nextInOrder = NULL;
+        else
+            a->firstInOrder = NULL;
+        
+        if (! treeRemove(&(a->memberTree), m1))
+            return 0;
+
+        freeMember(m1);
+        a->numMembers--;
+
+        return 1;
+    }
+
+    if (! circularMoveRightToLeft(dest, m1->position,
+                                    m2->position+m2->size, m1->size))
+        return 0;
+
+    adjustPositions(m1->nextInOrder, m2->nextInOrder, -m1->size);
+    for(mAux = m1->nextInOrder; mAux != m2->nextInOrder; mAux = mAux->nextInOrder)
+        mAux->order--;
+
+    if (m1->previousInOrder)
+        m1->previousInOrder->nextInOrder = m1->nextInOrder;
+    else
+        a->firstInOrder = m1->nextInOrder;
+
+    m1->nextInOrder->previousInOrder = m1->previousInOrder;
+
+    if (! treeRemove(&(a->memberTree), m1))
+        return 0;
+
+    freeMember(m1);
+    a->numMembers--;
 
     return 1;
+}
+
+int extractMember ( FILE* src, FILE* dest, char* name, archive_t* a )
+{
+    memberData_t* m1 = getMember(a, name);
+    if (! m1)
+        return 0;
+
+    if (! pasteBinary(src, dest, m1->position, 0, m1->size))
+        return 0;
+
+    return removeMember(src, a, name);
 }
 
 int writeArchive ( FILE* dest, archive_t* a )

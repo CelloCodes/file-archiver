@@ -301,13 +301,112 @@ void updateMoveMember ( int argc, char** argv,
 void extractMembers ( int argc, char** argv,
             int (*oper) ( FILE* src, FILE* dest, char* srcName, archive_t* a ) )
 {
-    return;
+    FILE* arq;
+    archive_t* archive;
+    char* filename = argv[optind];
+
+    switch (loadArchiveFromFile(&arq, filename, &archive)){
+    case 1:
+        fprintf(stderr, "Arquivo inexistente no caminho\n");
+        return;
+
+    case 2:
+        fprintf(stderr, "Falha de alocacao de memoria dinamica\n");
+        return;
+
+    case 3:
+        fprintf(stderr, "Falha ao carregar sessao de diretorio\n");
+        return;
+    }
+
+    // Caso nao tenha conseguido abrir, e nao tenha conseguido carregar o archive
+    if (! arq) {
+        freeArchive(archive);
+        fileOperationFailMessage(errno, filename);
+        exit(2);
+    }
+
+    int error;
+    FILE* dest;
+    for (unsigned int index = optind+1; index < argc; index++) {
+        dest = fopen(argv[index], "w");
+        if (! dest) {
+            freeArchive(archive);
+            fclose(arq);
+            fileOperationFailMessage(errno, argv[index]);
+            exit(2);
+        }
+        error = extractMember(arq, dest, argv[index], archive);
+        fclose(dest);
+
+        if (error == 0) {
+            fprintf(stderr, "%d Erro ao extrair membro do archive\n", error);
+            freeArchive(archive);
+            fclose(arq);
+
+            treatError(error);
+        }
+    }
+
+    error = writeArchive(arq, archive);
+    ftruncate(fileno(arq), ftell(arq));
+
+    freeArchive(archive);
+    fclose(arq);
+
+    if (error != 0)
+        treatError(error);
 }
 
 void removeMembers ( int argc, char** argv,
             int (*oper) ( FILE* src, FILE* dest, char* srcName, archive_t* a ) )
 {
-    return;
+    FILE* arq;
+    archive_t* archive;
+    char* filename = argv[optind];
+
+    switch (loadArchiveFromFile(&arq, filename, &archive)){
+    case 1:
+        fprintf(stderr, "Arquivo inexistente no caminho\n");
+        return;
+
+    case 2:
+        fprintf(stderr, "Falha de alocacao de memoria dinamica\n");
+        return;
+
+    case 3:
+        fprintf(stderr, "Falha ao carregar sessao de diretorio\n");
+        return;
+    }
+
+    // Caso nao tenha conseguido abrir, e nao tenha conseguido carregar o archive
+    if (! arq) {
+        freeArchive(archive);
+        fileOperationFailMessage(errno, filename);
+        exit(2);
+    }
+
+    int error;
+    for (unsigned int index = optind+1; index < argc; index++) {
+        error = removeMember(arq, archive, argv[index]);
+
+        if (error == 0) {
+            fprintf(stderr, "%d Erro ao remover membro do archive\n", error);
+            freeArchive(archive);
+            fclose(arq);
+
+            treatError(error);
+        }
+    }
+
+    error = writeArchive(arq, archive);
+    ftruncate(fileno(arq), ftell(arq));
+
+    freeArchive(archive);
+    fclose(arq);
+
+    if (error != 0)
+        treatError(error);
 }
 
 void listMembers( int argc, char** argv,
