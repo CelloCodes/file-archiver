@@ -758,10 +758,6 @@ int writeArchive ( FILE* dest, archive_t* a )
 
 void printArchive ( archive_t* a )
 {
-    printf("-/-/-/-/-/-/-/-/--/-/-/-/-/-/-/-/-/-/-/-/-/-/\n");
-    printf("Numero de Membros: %ld\n", a->numMembers);
-    printf("-/-/-/-/-/-/-/-/--/-/-/-/-/-/-/-/-/-/-/-/-/-/\n");
-
     memberData_t* m = a->firstInOrder;
 
     char perm[10];
@@ -778,15 +774,9 @@ void printArchive ( archive_t* a )
         for(i = 0; i < 9; i++)
             (m->permission & masks[i]) ? (perm[i] = full[i]) : (perm[i] = empty[i]);
         ts = *localtime(&m->modDate);
-        strftime(date, sizeof(date), "%d-%m-%Y %H:%M:%S %Z", &ts);
+        strftime(date, sizeof(date), "%Y-%m-%d %H:%M", &ts);
             
-        printf("Membro %2ld: %s\n", m->order, m->name);
-        printf("\tUID----------------: %d\n", m->UID);
-        printf("\tPermissoes---------: %s\n", perm);
-        printf("\tPosicao------------: %ld\n", m->position);
-        printf("\tTamanho------------: %ld bytes\n", m->size);
-        printf("\tData de Modificacao: %s\n", date);
-        printf("-/-/-/-/-/-/-/-/--/-/-/-/-/-/-/-/-/-/-/-/-/-/\n");
+        printf("%s %d %8ld %s %s\n", perm, m->UID, m->size, date, m->name);
         m = m->nextInOrder;
     }
 }
