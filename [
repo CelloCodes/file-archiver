@@ -233,13 +233,12 @@ int pasteBinary (FILE* src, FILE* dest, unsigned long start, unsigned long bytes
     return 1;
 }
 
-int adjustBinaryRight ( FILE* dest,  long bufSize, long start, long stop,
-                        unsigned long bytes )
+int adjustBinaryRight ( FILE* dest, long start, long stop, unsigned long bytes )
 {
     if (fseek(dest, start, SEEK_SET) == -1)
         return 0;
 
-    void* buffer = malloc(bufSize);
+    void* buffer = malloc(BUFFER_SIZE);
     if (! buffer)
         return 0;
 
@@ -249,8 +248,8 @@ int adjustBinaryRight ( FILE* dest,  long bufSize, long start, long stop,
         return 0;
     }
 
-    while ((curPos - bufSize) >= stop) {
-        if (fseek(dest, curPos-bufSize, SEEK_SET) == -1) {
+    while ((curPos - BUFFER_SIZE) >= stop) {
+        if (fseek(dest, curPos-BUFFER_SIZE, SEEK_SET) == -1) {
             free(buffer);
             return 0;
         }
@@ -261,9 +260,9 @@ int adjustBinaryRight ( FILE* dest,  long bufSize, long start, long stop,
             return 0;
         }
 
-        if (    (fread(buffer, bufSize, 1, dest) != 1)  || 
+        if (    (fread(buffer, BUFFER_SIZE, 1, dest) != 1)  || 
                 (fseek(dest, curPos+bytes, SEEK_SET) == -1) ||
-                (fwrite(buffer, bufSize, 1, dest) != 1) ||
+                (fwrite(buffer, BUFFER_SIZE, 1, dest) != 1) ||
                 (fseek(dest, curPos, SEEK_SET) == -1)       ){
 
             free(buffer);
@@ -335,9 +334,9 @@ int adjustBinaryLeft (  FILE* dest, long bufSize, long start, long stop,
     return 1;
 }
 
-void adjustPositions ( memberData_t* start, memberData_t* stop, long sizeDiff )
+void adjustPositions ( memberData_t* start, long sizeDiff )
 {
-    while (start != stop) {
+    while (start) {
         start->position += sizeDiff;
         start = start->nextInOrder;
     }
@@ -374,7 +373,7 @@ int insertMember ( FILE* src, FILE* dest, char* srcName, archive_t* a )
                 freeMember(member);
                 return 5;
             } else {
-                adjustPositions(oldMember->nextInOrder, NULL, sizeDiff) ;
+                adjustPositions(oldMember->nextInOrder, sizeDiff) ;
             }
         } else if (sizeDiff < 0) {
             if (! adjustBinaryLeft(dest, 
@@ -384,7 +383,7 @@ int insertMember ( FILE* src, FILE* dest, char* srcName, archive_t* a )
                 freeMember(member);
                 return 5;
             } else {
-                adjustPositions(oldMember->nextInOrder, NULL, sizeDiff) ;
+                adjustPositions(oldMember->nextInOrder, sizeDiff) ;
             }
         }
 
@@ -447,7 +446,7 @@ int updateMember ( FILE* src, FILE* dest, char* srcName, archive_t* a )
                 freeMember(member);
                 return 5;
             } else {
-                adjustPositions(oldMember->nextInOrder, NULL, sizeDiff) ;
+                adjustPositions(oldMember->nextInOrder, sizeDiff) ;
             }
         } else if (sizeDiff < 0) {
             if (! adjustBinaryLeft(dest, 
@@ -457,7 +456,7 @@ int updateMember ( FILE* src, FILE* dest, char* srcName, archive_t* a )
                 freeMember(member);
                 return 5;
             } else {
-                adjustPositions(oldMember->nextInOrder, NULL, sizeDiff) ;
+                adjustPositions(oldMember->nextInOrder, sizeDiff) ;
             }
         }
 
@@ -484,8 +483,8 @@ int updateMember ( FILE* src, FILE* dest, char* srcName, archive_t* a )
     return 0;
 }
 
-// moves size bytes "rotating" the memory region right to left
-int circularMoveRightToLeft ( FILE* dest, long start, long stop, long size )
+// moves member 1 to after member 2 "rotating" the memory region
+int circularMoveRightToLeft ( FILE* dest, memberData_t* m1, memberData_t* m2 )
 {
     void* buf = malloc(HALF_BUFFER);
     if (! buf)
@@ -493,28 +492,7 @@ int circularMoveRightToLeft ( FILE* dest, long start, long stop, long size )
 
     long curPos;
     long tamRead = 0;
-    while (tamRead + HALF_BUFFER <= size) {
-        if (fseek(dest, start, SEEK_SET) == -1)
-            return 0;
-
-        curPos = ftell(dest);
-        if (curPos < 0) {
-            free(buf);
-            return 0;
-        }
-
-        if ((fread(buf, HALF_BUFFER, 1, dest) != 1)                             ||
-            (! adjustBinaryLeft(dest, HALF_BUFFER, curPos, stop, -HALF_BUFFER)) ||
-            (fwrite(buf, HALF_BUFFER, 1, dest) != 1)                            ){
-
-            free(buf);
-            return 0;
-        }
-
-        tamRead += HALF_BUFFER;
-    }
-
-    if (tamRead < size) {
+    while (tamRead + HALF_BUFFER <= m1->size) {
         if (fseek(dest, m1->pos, SEEK_SET) == -1)
             return 0;
 
@@ -524,9 +502,36 @@ int circularMoveRightToLeft ( FILE* dest, long start, long stop, long size )
             return 0;
         }
 
-        if ((fread(buf, size - tamRead, 1, dest) != 1)                          ||
-            (! adjustBinaryLeft(dest, HALF_BUFFER, curPos, stop, size-tamRead)) ){
+        if (fread(buf, HALF_BUFFER, 1, dest) != 1) {
+            free(buf);
+            return 0;
+        }
+        if (! adjustBinaryLeft( dest, HALF_BUFFER, curPos, m2->pos+m2->size,
+                                HALF_BUFFER)) {
+            free(buf);
+            return 0;
+        }
 
+        tamRead += HALF_BUFFER;
+    }
+
+    if (tamRead < m1->size) {
+        if (fseek(dest, m1->pos, SEEK_SET) == -1)
+            return 0;
+
+        curPos = ftell(dest);
+        if (curPos < 0) {
+            free(buf);
+            return 0;
+        }
+
+        if (fread(buf, m1->size - tamRead, 1, dest) != 1) {
+            free(buf);
+            return 0;
+        }
+
+        if (! adjustBinaryLeft( dest, HALF_BUFFER, curPos, m2->pos+m2->size,
+                                m1->size - tamRead)) {
             free(buf);
             return 0;
         }
@@ -539,98 +544,8 @@ int circularMoveRightToLeft ( FILE* dest, long start, long stop, long size )
     return 1;
 }
 
-int circularMoveLeftToRight ( FILE* dest, long start, long stop, long size )
-{
-    void* buf = malloc(HALF_BUFFER);
-    if (! buf)
-        return 0;
-
-    long curPos;
-    long tamRead = 0;
-    while (tamRead + HALF_BUFFER <= size) {
-        if (fseek(dest, stop - HALF_BUFFER, SEEK_SET) == -1)
-            return 0;
-
-        curPos = ftell(dest);
-        if (curPos < 0) {
-            free(buf);
-            return 0;
-        }
-
-        if ((fread(buf, HALF_BUFFER, 1, dest) != 1)                 ||
-            (! adjustBinaryRight(dest, HALF_BUFFER,
-                                    start, stop, -HALF_BUFFER))     ||
-            (fseek(dest, start, SEEK_SET) == -1)                    ||
-            (fwrite(buf, HALF_BUFFER, 1, dest) != 1)                ){
-
-            free(buf);
-            return 0;
-        }
-
-        tamRead += HALF_BUFFER;
-    }
-
-    if (tamRead < size) {
-        if (fseek(dest, m1->pos, SEEK_SET) == -1)
-            return 0;
-
-        curPos = ftell(dest);
-        if (curPos < 0) {
-            free(buf);
-            return 0;
-        }
-
-        if ((fread(buf, size - tamRead, 1, dest) != 1)                          ||
-            (! adjustBinaryLeft(dest, HALF_BUFFER, curPos, stop, size-tamRead)) ){
-
-            free(buf);
-            return 0;
-        }
-
-        tamRead += m1->size - tamRead;
-    }
-
-    free(buf);
-
-    return 1;
-}
-
-
-memberData_t* getMember ( archive_t* a, char* name )
-{
-    memberData_t* m = allocateMember(name);
-    if (! m)
-        return NULL;
-
-    treeNode_t* tn = treeSearch(a->memberTree, m);
-    freeMember(m);
-
-    if (! tn)
-        return NULL;
-    return tn->key;
-}
-
-int moveMembers ( FILE* dest, archive_t* a, char* m1Name, char* m2Name ) 
-{
-    memberData_t* m1 = getMember(a, m1Name);
-    memberData_t* m2 = getMember(a, m2Name);
-    if ((! m1) || (! m2))
-        return 0;
-
-    if (m1->name == m2->name)
-        return 0;
-
-    if (m1->order < m2->order) {
-        if (! circularMoveRightToLeft(dest, m1, m2))
-            return 0;
-
-        adjustPositions(m1, m2, -m1->size);
-
-    } else {
-        if (! circularMoveLeftToRight())
-
-    }
-}
+int moveMembers ( FILE* dest, archive_t* a, 
+int updateMember ( FILE* src, FILE* dest, char* srcName, archive_t* a )
 
 int writeArchive ( FILE* dest, archive_t* a )
 {

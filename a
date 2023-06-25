@@ -1,0 +1,54 @@
+1 1
+    a1 b1
+
+    b1 a1
+
+2 1
+    a1 a2 b1
+
+    a2 a1 b1
+
+    b1 a1 a2
+
+1 2
+    a1 b1 b2
+    
+    a1 b2 b1
+
+    b1 b2 a1
+
+2 2
+    a1 a2 b1 b2
+
+    b1 b2 a1 a2
+
+3 1
+    a1 a2 a3 b1
+
+    a3 a1 a2 b1 
+
+    b1 a1 a2 a3
+
+1 3
+    a1 b1 b2 b3
+
+    a1 b2 b3 b1
+
+    b1 b2 b3 a1
+
+3 2
+    a1 a2 a3 b1 b2
+
+    a2 a3 a1 b1 b2
+
+    b1 b2 a1 a2 a3
+
+2 3
+    a1 a2 b1 b2 b3
+
+    a1 a2 b3 b1 b2
+
+    b1 b2 b3 a1 a2
+
+o segmento de tamanho igual ao outro membro adjacente a ele troca de lugar com o resto do proprio membro
+um movimento circular de escrita e leitura ate que as partes tenham trocado de lugar

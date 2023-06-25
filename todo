@@ -65,6 +65,18 @@ sobre a movimentacao:
     verifica a presenca dos dois membros indicados
     em seguida, executa o processo 3
 
+    PROCESSO 3 E OBSOLETO
+    HA UM JEITO MELHOR
+    movimentacao circular 
+    segmento e lido do comeco, em seguida segmento seguite e lido e escrito
+    no lugar do primeiro, terceiro e lido e escrito no lugar do segundo...
+    ate que todos os segmentos depois do primeiro ate o arquivo que sera movido
+    sao colocados um segmento pra esquerda e entao o primeiro segmento lido
+    e escrito no espaco que se abriu
+
+    esse metodo torna a movimentacao mais universao pois independe de saber
+    qual membro eh maior
+
 sobre a remocao:
     necessario "mover" os bytes que serao removidos para o final do arquivo e 
     entao truncar o arquivo
