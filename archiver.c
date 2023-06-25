@@ -366,6 +366,7 @@ int insertMember ( FILE* src, FILE* dest, char* srcName, archive_t* a )
     long sizeDiff;
     treeNode_t* tn = treeSearch(a->memberTree, member);
 
+    printf("comparando membro %s\n", member->name);
     if (tn) {
         memberData_t* oldMember = tn->key;
         sizeDiff = s.st_size - oldMember->size;
@@ -619,15 +620,15 @@ int moveMember ( FILE* dest, archive_t* a, char* m1Name, char* m2Name )
     memberData_t* m2 = getMember(a, m2Name);
     memberData_t* mAux = NULL;
     if ((! m1) || (! m2))
-        return 0;
+        return 1;
 
     if (m1->name == m2->name)
-        return 0;
+        return 1;
 
     if (m1->order < m2->order) {
         if (! circularMoveRightToLeft(dest, m1->position,
                                         m2->position+m2->size, m1->size))
-            return 0;
+            return 1;
 
         adjustPositions(m1->nextInOrder, m2->nextInOrder, -m1->size);
         for(mAux = m1->nextInOrder; mAux != m2->nextInOrder; mAux = mAux->nextInOrder)
@@ -653,11 +654,11 @@ int moveMember ( FILE* dest, archive_t* a, char* m1Name, char* m2Name )
 
     } else {
         if (m1->order == (m2->order + 1))
-            return 1;
+            return 0;
 
         if (! circularMoveLeftToRight(dest, m2->position + m2->size,
                                         m1->position + m1->size, m1->size))
-            return 0;
+            return 1;
 
         adjustPositions(m2->nextInOrder, m1, m1->size);
         for(mAux = m2->nextInOrder; mAux != m1; mAux = mAux->nextInOrder)
@@ -679,7 +680,7 @@ int moveMember ( FILE* dest, archive_t* a, char* m1Name, char* m2Name )
         m2->nextInOrder= m1;
     }
 
-    return 1;
+    return 0;
 }
 
 int removeMember ( FILE* dest, archive_t* a, char* m1Name ) 
@@ -688,7 +689,7 @@ int removeMember ( FILE* dest, archive_t* a, char* m1Name )
     memberData_t* m2 = a->lastInOrder;
     memberData_t* mAux = NULL;
     if ((! m1) || (! m2))
-        return 0;
+        return 1;
 
     if (m1->name == m2->name) {
         a->lastInOrder = m1->previousInOrder;    
@@ -698,17 +699,17 @@ int removeMember ( FILE* dest, archive_t* a, char* m1Name )
             a->firstInOrder = NULL;
         
         if (! treeRemove(&(a->memberTree), m1))
-            return 0;
+            return 1;
 
         freeMember(m1);
         a->numMembers--;
 
-        return 1;
+        return 0;
     }
 
     if (! circularMoveRightToLeft(dest, m1->position,
                                     m2->position+m2->size, m1->size))
-        return 0;
+        return 1;
 
     adjustPositions(m1->nextInOrder, m2->nextInOrder, -m1->size);
     for(mAux = m1->nextInOrder; mAux != m2->nextInOrder; mAux = mAux->nextInOrder)
@@ -722,40 +723,37 @@ int removeMember ( FILE* dest, archive_t* a, char* m1Name )
     m1->nextInOrder->previousInOrder = m1->previousInOrder;
 
     if (! treeRemove(&(a->memberTree), m1))
-        return 0;
+        return 1;
 
     freeMember(m1);
     a->numMembers--;
 
-    return 1;
+    return 0;
 }
 
 int extractMember ( FILE* src, FILE* dest, char* name, archive_t* a )
 {
     memberData_t* m1 = getMember(a, name);
     if (! m1)
-        return 0;
+        return 1;
 
     if (! pasteBinary(src, dest, m1->position, 0, m1->size))
-        return 0;
+        return 1;
 
-    return removeMember(src, a, name);
+    return 0;
 }
 
 int writeArchive ( FILE* dest, archive_t* a )
 {
     if (fseek(dest, 0, SEEK_SET) == -1)
-        return 0;
+        return 1;
 
     int pos = getFirstFreeByte(a);
     if (fwrite(&pos, sizeof(int), 1, dest) != 1)
-        return 0;
+        return 1;
 
-    long numNodes = 0;
-    if (a->lastInOrder)
-        numNodes = a->lastInOrder->order + 1;
-
-    return treeWriteBFS(dest, a->memberTree, numNodes, pos);
+    printArchive(a);
+    return treeWriteBFS(dest, a->memberTree, a->numMembers, pos);
 }
 
 void printArchive ( archive_t* a )

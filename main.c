@@ -4,6 +4,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <errno.h>
+#include <string.h>
 
 #include "archiver.h"
 #define BUFFER_SIZE 1024
@@ -41,11 +42,6 @@ int main(int argc, char **argv)
     void (*fp) (int argc, char** argv,
                 int (*uF) (FILE* src, FILE* dest, char* srcName, archive_t* a));
     int (*oper) (FILE* src, FILE* dest, char* srcName, archive_t* a);
-
-    if (argc <= 2) {
-        fprintf(stderr, "Opcao invalida\n");
-        exit(1);
-    }		
 
     oper = NULL;
     while ((opt = getopt(argc, argv, "iam:xrch")) != -1) {
@@ -90,9 +86,15 @@ int main(int argc, char **argv)
 
         default:
             fprintf(stderr, "Opcao invalida\n");
-            exit(1);
+            return 0;
         }		
     }
+
+    if ((argc <= 2) && (fp != help)) {
+        fprintf(stderr, "Opcao invalida\n");
+        return 1;
+    }		
+
 
     fp(argc, argv, oper);
 
@@ -120,92 +122,69 @@ void fileOperationFailMessage ( int err, char* filename )
         fprintf(stderr, "\tDiretorio ou arquivo inexistente no caminho descrito\n");
 }
 
-void exitFail ( char* message, int code )
+char* createTmpCopy ( FILE* f, char* fName )
 {
-    fprintf(stderr, "%s\n", message);
-    exit(code);
+    char* name = malloc(strlen(fName) + 5);
+    if (! name)
+        return NULL;
+
+    int i;
+    for (i = 0; i < strlen(fName); i++)
+        name[i] = fName[i];
+
+    name[i++] = '.';
+    name[i++] = 't';
+    name[i++] = 'm';
+    name[i++] = 'p';
+    name[i++] = '\0';
+
+    FILE* copy = fopen(name, "w");
+    if (! copy) {
+        free(name);
+        return NULL;
+    }
+
+    void* buf = malloc(BUFFER_SIZE);
+    if (! buf) {
+        free(name);
+        fclose(copy);
+        return NULL;
+    }
+
+    struct stat s;
+    stat(fName, &s);
+
+    long pos = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    long tamRead = 0;
+    while (tamRead + BUFFER_SIZE <= s.st_size) {
+        fread(buf, BUFFER_SIZE, 1, f);
+        fwrite(buf, BUFFER_SIZE, 1, copy);
+        tamRead += BUFFER_SIZE;
+    }
+
+    if (tamRead < s.st_size) {
+        fread(buf, s.st_size - tamRead, 1, f);
+        fwrite(buf, s.st_size - tamRead, 1, copy);
+    }
+
+    fseek(f, pos, SEEK_SET);
+
+    free(buf);
+    fclose(copy);
+
+    return name;
 }
 
-void treatError ( int code )
+void revertToCopy ( char* origName, char* copyName )
 {
-    fprintf(stderr, "Erro %d\n", code);
-    exit(1);
-}
-
-void updateInsertMembers ( int argc, char** argv,
-            int (*oper) ( FILE* src, FILE* dest, char* srcName, archive_t* a ) )
-{
-    int error;
-
-    archive_t* archive = allocateArchive();
-    if (! archive)
-        exitFail("Falha de alocacao de memoria dinamica", 1);
-
-    // Tentando abrir o archive 
-    char* filename = argv[optind];
-    FILE* arq = fopen(filename, "r+");
-    if (! arq) {
-        if (errno == EACCES) {
-            fileOperationFailMessage(errno, filename);
-            freeArchive(archive);
-            exit(2);
-
-        // Caso a falha tenha ocorrido por motivo de nao existir algo no caminho
-        // tenta criar o arquivo, imanginando que foi passado um diretorio
-        // e o archive nao existe nele
-        } else if (errno == ENOENT) {
-            arq = fopen(filename, "w");
-        }
-
-    // Caso nao tenha conseguido abrir, tenta carregar os dados dos membros
-    } else {
-        error = loadArchive (arq, archive);
-        if (error != 0) {
-            fclose(arq);
-            freeArchive(archive);
-
-            fprintf(stderr, "Falha ao ler dados do arquivo '%s'\n", filename);
-            exit(3);
-        }
+    if ((remove(origName)) || (rename(copyName, origName))) {
+        fprintf(stderr, "Falha ao reverter para copia temporaria do archive");
+        fprintf(stderr, " Archive pode estar corrompido.");
     }
 
-    // Caso nao tenha conseguido abrir, e nao tenha conseguido
-    if (! arq) {
-        freeArchive(archive);
-        fileOperationFailMessage(errno, filename);
-        exit(2);
-    }
-
-    FILE* src;
-    for (unsigned int index = optind+1; index < argc; index++) {
-        src = fopen(argv[index], "r");
-        if (! src) {
-            freeArchive(archive);
-            fclose(arq);
-            fileOperationFailMessage(errno, argv[index]);
-            exit(2);
-        }
-
-        error = oper(src, arq, argv[index], archive);
-        fclose(src);
-
-        if (error != 0) {
-            fprintf(stderr, "Erro ao inserir membro no archive\n");
-            freeArchive(archive);
-            fclose(arq);
-
-            treatError(error);
-        }
-    }
-
-    error = writeArchive(arq, archive);
-    ftruncate(fileno(arq), ftell(arq));
-
-    freeArchive(archive);
-    fclose(arq);
-
-    if (error != 0)
-        treatError(error);
+    fprintf(stderr, "Falha na operacao. Archive restaurado de copia temporaria.\n");
+    free(copyName);
 }
 
 int loadArchiveFromFile ( FILE** f, char* fName, archive_t** a )
@@ -217,30 +196,114 @@ int loadArchiveFromFile ( FILE** f, char* fName, archive_t** a )
     // Tentando abrir o a 
     *f = fopen(fName, "r+");
     if (! (*f)) {
+        freeArchive(*a);
         if (errno == EACCES) {
-            //fileOperationFailMessage(errno, filename);
-            freeArchive(*a);
+            fileOperationFailMessage(errno, fName);
             return 3;
 
         // Caso a falha tenha ocorrido por motivo de nao existir algo no caminho
         // pode ser o arquivo ou algum diretorio no caminho
-        // se for o arquivo vai tentar criar mais pra frente
+        // se for o arquivo vai tentar criar
         } else if (errno == ENOENT) {
             return 1;
         }
 
     } else {
-        int error = loadArchive (*f, *a);
-        if (error != 0) {
+        if (loadArchive (*f, *a)) {
             fclose(*f);
             freeArchive(*a);
-
-            //fprintf(stderr, "Falha ao ler dados do arquivo '%s'\n", filename);
             return 3;
         }
     }
 
     return 0;
+}
+
+int createArchiveFile ( FILE** f, char* fName, archive_t** a )
+{
+    *a = allocateArchive();
+    if (! (*a))
+        return 0;
+
+    *f = fopen(fName, "w+");
+    if (! (*f)) {
+        freeArchive(*a);
+        return 0;
+    }
+
+    return 1;
+}
+
+void updateInsertMembers ( int argc, char** argv,
+            int (*oper) ( FILE* src, FILE* dest, char* srcName, archive_t* a ) )
+{
+    int error;
+
+    FILE* arq;
+    archive_t* archive;
+    char* filename = argv[optind];
+
+    switch (loadArchiveFromFile(&arq, filename, &archive)) {
+    case 1:
+        if (! createArchiveFile(&arq, filename, &archive)) {
+            fprintf(stderr, "Falha ao criar o arquivo %s\n", filename);
+            exit(1);
+        }
+        break;
+
+    case 2:
+        fprintf(stderr, "Falha de alocacao de memoria dinamica\n");
+        exit(1);
+
+    case 3:
+        fprintf(stderr, "Falha ao carregar sessao de diretorio\n");
+        exit(1);
+    }
+
+    char* copyName = createTmpCopy(arq, filename);
+    if (! copyName) {
+        fprintf(stderr, "Falha ao criar copia temporaria para edicao do arquivo\n");
+        freeArchive(archive);
+        fclose(arq);
+        exit(1);
+    }
+
+    FILE* src;
+    for (unsigned int index = optind+1; index < argc; index++) {
+        src = fopen(argv[index], "r");
+        if (! src) {
+            freeArchive(archive);
+            fclose(arq);
+            fileOperationFailMessage(errno, argv[index]);
+            revertToCopy(filename, copyName);
+            exit(1);
+        }
+
+        error = oper(src, arq, argv[index], archive);
+        fclose(src);
+
+        if (error) {
+            fprintf(stderr, "Erro ao inserir membro no archive\n");
+            freeArchive(archive);
+            fclose(arq);
+            revertToCopy(filename, copyName);
+            exit(1);
+        }
+    }
+
+    error = writeArchive(arq, archive);
+    ftruncate(fileno(arq), ftell(arq));
+
+    freeArchive(archive);
+    fclose(arq);
+
+    if (error) {
+        revertToCopy(filename, copyName);
+        exit(1);
+    }
+
+    remove(copyName);
+    free(copyName);
 }
 
 // optarg is in argv[0]
@@ -259,33 +322,33 @@ void updateMoveMember ( int argc, char** argv,
     switch (loadArchiveFromFile(&arq, filename, &archive)){
     case 1:
         fprintf(stderr, "Arquivo inexistente no caminho\n");
-        // tenta criar o arquivo
-        break;
+        exit(1);
 
     case 2:
         fprintf(stderr, "Falha de alocacao de memoria dinamica\n");
-        return;
+        exit(1);
 
     case 3:
         fprintf(stderr, "Falha ao carregar sessao de diretorio\n");
-        return;
+        exit(1);
     }
 
-    // Caso nao tenha conseguido abrir, e nao tenha conseguido
-    if (! arq) {
+    char* copyName = createTmpCopy(arq, filename);
+    if (! copyName) {
+        fprintf(stderr, "Falha ao criar copia temporaria para edicao do arquivo\n");
         freeArchive(archive);
-        fileOperationFailMessage(errno, filename);
-        exit(2);
+        fclose(arq);
+        exit(1);
     }
 
     int error = moveMember(arq, archive, argv[0], argv[optind+1]);
 
-    if (error == 0) {
+    if (error) {
         fprintf(stderr, "Erro ao mover bytes do archive\n");
         freeArchive(archive);
         fclose(arq);
-
-        treatError(error);
+        revertToCopy(filename, copyName);
+        exit(1);
     }
 
     error = writeArchive(arq, archive);
@@ -294,8 +357,13 @@ void updateMoveMember ( int argc, char** argv,
     freeArchive(archive);
     fclose(arq);
 
-    if (error != 0)
-        treatError(error);
+    if (error) {
+        revertToCopy(filename, copyName);
+        exit(1);
+    }
+
+    remove(copyName);
+    free(copyName);
 }
 
 void extractMembers ( int argc, char** argv,
@@ -319,13 +387,6 @@ void extractMembers ( int argc, char** argv,
         return;
     }
 
-    // Caso nao tenha conseguido abrir, e nao tenha conseguido carregar o archive
-    if (! arq) {
-        freeArchive(archive);
-        fileOperationFailMessage(errno, filename);
-        exit(2);
-    }
-
     int error;
     FILE* dest;
     for (unsigned int index = optind+1; index < argc; index++) {
@@ -334,28 +395,21 @@ void extractMembers ( int argc, char** argv,
             freeArchive(archive);
             fclose(arq);
             fileOperationFailMessage(errno, argv[index]);
-            exit(2);
+            exit(1);
         }
         error = extractMember(arq, dest, argv[index], archive);
         fclose(dest);
 
-        if (error == 0) {
+        if (error) {
             fprintf(stderr, "%d Erro ao extrair membro do archive\n", error);
             freeArchive(archive);
             fclose(arq);
-
-            treatError(error);
+            exit(1);
         }
     }
 
-    error = writeArchive(arq, archive);
-    ftruncate(fileno(arq), ftell(arq));
-
     freeArchive(archive);
     fclose(arq);
-
-    if (error != 0)
-        treatError(error);
 }
 
 void removeMembers ( int argc, char** argv,
@@ -379,23 +433,24 @@ void removeMembers ( int argc, char** argv,
         return;
     }
 
-    // Caso nao tenha conseguido abrir, e nao tenha conseguido carregar o archive
-    if (! arq) {
+    char* copyName = createTmpCopy(arq, filename);
+    if (! copyName) {
+        fprintf(stderr, "Falha ao criar copia temporaria para edicao do arquivo\n");
         freeArchive(archive);
-        fileOperationFailMessage(errno, filename);
-        exit(2);
+        fclose(arq);
+        exit(1);
     }
 
     int error;
     for (unsigned int index = optind+1; index < argc; index++) {
         error = removeMember(arq, archive, argv[index]);
 
-        if (error == 0) {
+        if (error) {
             fprintf(stderr, "%d Erro ao remover membro do archive\n", error);
             freeArchive(archive);
             fclose(arq);
-
-            treatError(error);
+            revertToCopy(filename, copyName);
+            exit(1);
         }
     }
 
@@ -405,38 +460,34 @@ void removeMembers ( int argc, char** argv,
     freeArchive(archive);
     fclose(arq);
 
-    if (error != 0)
-        treatError(error);
+    if (error) {
+        revertToCopy(filename, copyName);
+        exit(1);
+    }
+
+    remove(copyName);
+    free(copyName);
 }
 
 void listMembers( int argc, char** argv,
             int (*oper) ( FILE* src, FILE* dest, char* srcName, archive_t* a ) )
 {
+    FILE* arq;
+    archive_t* archive;
     char* filename = argv[optind];
-    FILE* arq = fopen(filename, "r+");
-    if (! arq) {
-        fprintf(stderr, "Falha ao abrir o arquivo '%s' para leitura\n", filename);
-        if (errno == EACCES)
-            fprintf(stderr, "\tSem permissao para acessar o caminho/arquivo descrito\n");
-        else if (errno == ENOENT)
-            fprintf(stderr, "\tDiretorio ou arquivo inexistente no caminho descrito\n");
-        
-        exit(2);
-    }
 
-    archive_t* archive = allocateArchive();
-    if (! archive) {
-        fclose(arq);
-        exitFail("Falha de alocacao de memoria dinamica", 1);
-    }
+    switch (loadArchiveFromFile(&arq, filename, &archive)){
+    case 1:
+        fprintf(stderr, "Arquivo inexistente no caminho\n");
+        return;
 
-    int error;
-    error = loadArchive (arq, archive);
-    if (error != 0) {
-        fprintf(stderr, "Falha ao ler dados do arquivo '%s'\n", filename);
-        fclose(arq);
-        freeArchive(archive);
-        exit(3);
+    case 2:
+        fprintf(stderr, "Falha de alocacao de memoria dinamica\n");
+        return;
+
+    case 3:
+        fprintf(stderr, "Falha ao carregar sessao de diretorio\n");
+        return;
     }
 
     printArchive(archive); 

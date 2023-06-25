@@ -510,24 +510,21 @@ size_t height ( treeNode_t* n )
 int treeWriteBFS ( FILE* dest, treeNode_t* root, long numNodes, int start ) {
     if (fseek(dest, start, SEEK_SET) == -1)
         return 2;
+    
+    if (fwrite(&numNodes, sizeof(numNodes), 1, dest) != 1)
+        return 2;
 
     if (! root)
-        return 1;
+        return 0;
 
     struct fila *f = criaFila();
     if (! f)
         return 1;
 
-    if (fwrite(&numNodes, sizeof(numNodes), 1, dest) != 1) {
-        destroiFila(f);
-        return 2;
-    }
-    
     if (enfileirar(f, root) == 0) {
         destroiFila(f);
         return 1;
     }
-
 
     treeNode_t *n;
     memberData_t* m;
