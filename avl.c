@@ -20,15 +20,10 @@ int memberLessThan ( memberData_t* m1, memberData_t* m2 )
         i++;
     }
 
-    if (m2->name[i] == '\0') {
-        if (m1->name[i] == '\0') {
-            return 0;
-        } else {
-            return 1;
-        }
-    }
+    if (m2->name[i] == '\0')
+        return 0;
 
-    return 0;
+    return 1;
 }
 
 int memberGreaterThan ( memberData_t* m1, memberData_t* m2 )
@@ -43,15 +38,10 @@ int memberGreaterThan ( memberData_t* m1, memberData_t* m2 )
         i++;
     }
 
-    if (m2->name[i] == '\0') {
-        if (m1->name[i] == '\0') {
-            return 0;
-        } else {
-            return 1;
-        }
-    }
+    if (m1->name[i] == '\0')
+        return 0;
 
-    return 0;
+    return 1;
 }
 
 int memberEquals ( memberData_t* m1, memberData_t* m2 )
@@ -307,6 +297,7 @@ treeNode_t* treeInsert ( treeNode_t** root, memberData_t* key ) {
             atual = atual->rightSon;
         } else {
             free(n);
+            printf("membro %s eh igual a %s e ja esta na arvore\n", key->name, atual->key->name);
             return NULL;
         }
     }

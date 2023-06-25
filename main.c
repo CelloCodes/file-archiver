@@ -9,11 +9,11 @@
 #define BUFFER_SIZE 1024
 
 //
-void updateMembers ( int argc, char** argv,
+void updateInsertMembers ( int argc, char** argv,
             int (*oper) ( FILE* src, FILE* dest, char* srcName, archive_t* a ) );
 
 //
-void moveMember ( int argc, char** argv,
+void updateMoveMember ( int argc, char** argv,
             int (*oper) ( FILE* src, FILE* dest, char* srcName, archive_t* a ) );
 
 //
@@ -51,20 +51,20 @@ int main(int argc, char **argv)
     while ((opt = getopt(argc, argv, "iam:xrch")) != -1) {
         switch (opt) {
         case 'i':
-            fp = updateMembers;
+            fp = updateInsertMembers;
             oper = insertMember;
             optCountVerify(&optCount);
             break;
 
         case 'a':
-            fp = updateMembers;
+            fp = updateInsertMembers;
             oper = updateMember;
             optCountVerify(&optCount);
             break;
 
         case 'm':
             argv[0] = optarg;
-            fp = moveMember;
+            fp = updateMoveMember;
             optCountVerify(&optCount);
             break;
 
@@ -132,7 +132,7 @@ void treatError ( int code )
     exit(1);
 }
 
-void updateMembers ( int argc, char** argv,
+void updateInsertMembers ( int argc, char** argv,
             int (*oper) ( FILE* src, FILE* dest, char* srcName, archive_t* a ) )
 {
     int error;
@@ -208,11 +208,94 @@ void updateMembers ( int argc, char** argv,
         treatError(error);
 }
 
+int loadArchiveFromFile ( FILE** f, char* fName, archive_t** a )
+{
+    *a = allocateArchive();
+    if (! (*a))
+        return 2;
+
+    // Tentando abrir o a 
+    *f = fopen(fName, "r+");
+    if (! (*f)) {
+        if (errno == EACCES) {
+            //fileOperationFailMessage(errno, filename);
+            freeArchive(*a);
+            return 3;
+
+        // Caso a falha tenha ocorrido por motivo de nao existir algo no caminho
+        // pode ser o arquivo ou algum diretorio no caminho
+        // se for o arquivo vai tentar criar mais pra frente
+        } else if (errno == ENOENT) {
+            return 1;
+        }
+
+    } else {
+        int error = loadArchive (*f, *a);
+        if (error != 0) {
+            fclose(*f);
+            freeArchive(*a);
+
+            //fprintf(stderr, "Falha ao ler dados do arquivo '%s'\n", filename);
+            return 3;
+        }
+    }
+
+    return 0;
+}
+
 // optarg is in argv[0]
-void moveMember ( int argc, char** argv,
+void updateMoveMember ( int argc, char** argv,
             int (*oper) ( FILE* src, FILE* dest, char* srcName, archive_t* a ) )
 {
-    return;
+    if (argc > 5) {
+        fprintf(stderr, "Parametros incorretos\n");
+        return;
+    }
+
+    FILE* arq;
+    archive_t* archive;
+    char* filename = argv[optind];
+
+    switch (loadArchiveFromFile(&arq, filename, &archive)){
+    case 1:
+        fprintf(stderr, "Arquivo inexistente no caminho\n");
+        // tenta criar o arquivo
+        break;
+
+    case 2:
+        fprintf(stderr, "Falha de alocacao de memoria dinamica\n");
+        return;
+
+    case 3:
+        fprintf(stderr, "Falha ao carregar sessao de diretorio\n");
+        return;
+    }
+
+    // Caso nao tenha conseguido abrir, e nao tenha conseguido
+    if (! arq) {
+        freeArchive(archive);
+        fileOperationFailMessage(errno, filename);
+        exit(2);
+    }
+
+    int error = moveMember(arq, archive, argv[0], argv[optind+1]);
+
+    if (error == 0) {
+        fprintf(stderr, "Erro ao mover bytes do archive\n");
+        freeArchive(archive);
+        fclose(arq);
+
+        treatError(error);
+    }
+
+    error = writeArchive(arq, archive);
+    ftruncate(fileno(arq), ftell(arq));
+
+    freeArchive(archive);
+    fclose(arq);
+
+    if (error != 0)
+        treatError(error);
 }
 
 void extractMembers ( int argc, char** argv,

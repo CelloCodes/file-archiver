@@ -1,0 +1,60 @@
+inseriu membro ./avl.c na posicao 4
+inseriu membro ./archiver.c na posicao 3
+inseriu membro ./teste.c na posicao 0
+inseriu membro ./a na posicao 1
+inseriu membro ./fila.c na posicao 5
+inseriu membro ./todo na posicao 2
+inseriu membro ./main.c na posicao 6
+-/-/-/-/-/-/-/-/--/-/-/-/-/-/-/-/-/-/-/-/-/-/
+Numero de Membros: 7
+-/-/-/-/-/-/-/-/--/-/-/-/-/-/-/-/-/-/-/-/-/-/
+Membro  0: ./a
+	UID----------------: 1988
+	Permissoes---------: rw-------
+	Posicao------------: 4
+	Tamanho------------: 589 bytes
+	Data de Modificacao: 25-06-2023 11:42:00 -03
+-/-/-/-/-/-/-/-/--/-/-/-/-/-/-/-/-/-/-/-/-/-/
+Membro  1: ./todo
+	UID----------------: 1988
+	Permissoes---------: rw-------
+	Posicao------------: 593
+	Tamanho------------: 4592 bytes
+	Data de Modificacao: 25-06-2023 11:59:27 -03
+-/-/-/-/-/-/-/-/--/-/-/-/-/-/-/-/-/-/-/-/-/-/
+Membro  2: ./archiver.c
+	UID----------------: 1988
+	Permissoes---------: rw-------
+	Posicao------------: 5185
+	Tamanho------------: 19168 bytes
+	Data de Modificacao: 25-06-2023 17:01:53 -03
+-/-/-/-/-/-/-/-/--/-/-/-/-/-/-/-/-/-/-/-/-/-/
+Membro  3: ./avl.c
+	UID----------------: 1988
+	Permissoes---------: rw-------
+	Posicao------------: 24353
+	Tamanho------------: 14588 bytes
+	Data de Modificacao: 25-06-2023 15:09:52 -03
+-/-/-/-/-/-/-/-/--/-/-/-/-/-/-/-/-/-/-/-/-/-/
+Membro  4: ./fila.c
+	UID----------------: 1988
+	Permissoes---------: rw-------
+	Posicao------------: 38941
+	Tamanho------------: 1036 bytes
+	Data de Modificacao: 21-06-2023 14:17:05 -03
+-/-/-/-/-/-/-/-/--/-/-/-/-/-/-/-/-/-/-/-/-/-/
+Membro  6: ./main.c
+	UID----------------: 1988
+	Permissoes---------: rw-------
+	Posicao------------: 39977
+	Tamanho------------: 8766 bytes
+	Data de Modificacao: 25-06-2023 16:56:24 -03
+-/-/-/-/-/-/-/-/--/-/-/-/-/-/-/-/-/-/-/-/-/-/
+Membro  7: ./teste.c
+	UID----------------: 1988
+	Permissoes---------: rw-------
+	Posicao------------: 48743
+	Tamanho------------: 392 bytes
+	Data de Modificacao: 19-06-2023 16:21:25 -03
+-/-/-/-/-/-/-/-/--/-/-/-/-/-/-/-/-/-/-/-/-/-/
+primeiro membro ./a ultimo membro ./teste.c

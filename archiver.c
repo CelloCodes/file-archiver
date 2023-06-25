@@ -307,7 +307,6 @@ int adjustBinaryLeft (  FILE* dest, long bufSize, long start, long stop,
                 (fseek(dest, curPos + bytes, SEEK_SET) == -1)   ||
                 (fwrite(buffer, bufSize, 1, dest) != 1)         ||
                 (fseek(dest, -bytes, SEEK_CUR) == -1)           ){
-
             free(buffer);
             return 0;
         }
@@ -329,6 +328,7 @@ int adjustBinaryLeft (  FILE* dest, long bufSize, long start, long stop,
             return 0;
         }
     }
+
     
     free(buffer);
 
@@ -367,18 +367,17 @@ int insertMember ( FILE* src, FILE* dest, char* srcName, archive_t* a )
         sizeDiff = s.st_size - oldMember->size;
 
         if (sizeDiff > 0) {
-            if (! adjustBinaryRight(dest,
+            if (! adjustBinaryRight(dest, BUFFER_SIZE,
                         oldMember->position + oldMember->size,
-                        getFirstFreeByte(a),
-                        sizeDiff)) {
+                        getFirstFreeByte(a), sizeDiff)) {
                 freeMember(member);
                 return 5;
             } else {
                 adjustPositions(oldMember->nextInOrder, NULL, sizeDiff) ;
             }
         } else if (sizeDiff < 0) {
-            if (! adjustBinaryLeft(dest, 
-                        oldMember->position + oldMember->size, 
+            if (! adjustBinaryLeft(dest, BUFFER_SIZE,
+                        oldMember->position + oldMember->size,
                         getFirstFreeByte(a),
                         sizeDiff)) {
                 freeMember(member);
@@ -399,7 +398,6 @@ int insertMember ( FILE* src, FILE* dest, char* srcName, archive_t* a )
         }
 
         pastePosition = getFirstFreeByte(a);
-        fillMemberStat(member, &s);
         member->position = pastePosition;
         insertInOrder(a, member);
         a->numMembers++;
@@ -440,7 +438,7 @@ int updateMember ( FILE* src, FILE* dest, char* srcName, archive_t* a )
         }
 
         if (sizeDiff > 0) {
-            if (! adjustBinaryRight(dest,
+            if (! adjustBinaryRight(dest, BUFFER_SIZE,
                         oldMember->position + oldMember->size,
                         getFirstFreeByte(a),
                         sizeDiff)) {
@@ -450,7 +448,7 @@ int updateMember ( FILE* src, FILE* dest, char* srcName, archive_t* a )
                 adjustPositions(oldMember->nextInOrder, NULL, sizeDiff) ;
             }
         } else if (sizeDiff < 0) {
-            if (! adjustBinaryLeft(dest, 
+            if (! adjustBinaryLeft(dest, BUFFER_SIZE,
                         oldMember->position + oldMember->size, 
                         getFirstFreeByte(a),
                         sizeDiff)) {
@@ -504,7 +502,8 @@ int circularMoveRightToLeft ( FILE* dest, long start, long stop, long size )
         }
 
         if ((fread(buf, HALF_BUFFER, 1, dest) != 1)                             ||
-            (! adjustBinaryLeft(dest, HALF_BUFFER, curPos, stop, -HALF_BUFFER)) ||
+            (! adjustBinaryLeft(dest, HALF_BUFFER, start+HALF_BUFFER,
+                                stop, -HALF_BUFFER)) ||
             (fwrite(buf, HALF_BUFFER, 1, dest) != 1)                            ){
 
             free(buf);
@@ -515,7 +514,7 @@ int circularMoveRightToLeft ( FILE* dest, long start, long stop, long size )
     }
 
     if (tamRead < size) {
-        if (fseek(dest, m1->pos, SEEK_SET) == -1)
+        if (fseek(dest, start, SEEK_SET) == -1)
             return 0;
 
         curPos = ftell(dest);
@@ -531,7 +530,7 @@ int circularMoveRightToLeft ( FILE* dest, long start, long stop, long size )
             return 0;
         }
 
-        tamRead += m1->size - tamRead;
+        tamRead += size - tamRead;
     }
 
     free(buf);
@@ -571,7 +570,7 @@ int circularMoveLeftToRight ( FILE* dest, long start, long stop, long size )
     }
 
     if (tamRead < size) {
-        if (fseek(dest, m1->pos, SEEK_SET) == -1)
+        if (fseek(dest, start, SEEK_SET) == -1)
             return 0;
 
         curPos = ftell(dest);
@@ -587,7 +586,7 @@ int circularMoveLeftToRight ( FILE* dest, long start, long stop, long size )
             return 0;
         }
 
-        tamRead += m1->size - tamRead;
+        tamRead += size - tamRead;
     }
 
     free(buf);
@@ -610,10 +609,11 @@ memberData_t* getMember ( archive_t* a, char* name )
     return tn->key;
 }
 
-int moveMembers ( FILE* dest, archive_t* a, char* m1Name, char* m2Name ) 
+int moveMember ( FILE* dest, archive_t* a, char* m1Name, char* m2Name ) 
 {
     memberData_t* m1 = getMember(a, m1Name);
     memberData_t* m2 = getMember(a, m2Name);
+    memberData_t* mAux = NULL;
     if ((! m1) || (! m2))
         return 0;
 
@@ -621,15 +621,63 @@ int moveMembers ( FILE* dest, archive_t* a, char* m1Name, char* m2Name )
         return 0;
 
     if (m1->order < m2->order) {
-        if (! circularMoveRightToLeft(dest, m1, m2))
+        if (! circularMoveRightToLeft(dest, m1->position,
+                                        m2->position+m2->size, m1->size))
             return 0;
 
-        adjustPositions(m1, m2, -m1->size);
+        adjustPositions(m1->nextInOrder, m2->nextInOrder, -m1->size);
+        for(mAux = m1->nextInOrder; mAux != m2->nextInOrder; mAux = mAux->nextInOrder)
+            mAux->order--;
+        m1->order = m2->order + 1;
+        m1->position = m2->position + m2->size;
+
+        if (m1->previousInOrder)
+            m1->previousInOrder->nextInOrder = m1->nextInOrder;
+        else
+            a->firstInOrder = m1->nextInOrder;
+
+        m1->nextInOrder->previousInOrder = m1->previousInOrder;
+
+        m1->nextInOrder = m2->nextInOrder;
+        if (m1->nextInOrder)
+            m1->nextInOrder->previousInOrder = m1;
+        else
+            a->lastInOrder = m1;
+
+        m1->previousInOrder = m2;
+        m2->nextInOrder= m1;
 
     } else {
-        if (! circularMoveLeftToRight())
+        if (m1->order == (m2->order + 1))
+            return 1;
 
+        if (! circularMoveLeftToRight(dest, m2->position + m2->size,
+                                        m1->position + m1->size, m1->size))
+            return 0;
+
+        adjustPositions(m2->nextInOrder, m1, m1->size);
+        for(mAux = m2->nextInOrder; mAux != m1; mAux = mAux->nextInOrder)
+            mAux->order++;
+        m1->order = m2->order + 1;
+        m1->position = m2->position + m2->size;
+
+        m1->previousInOrder->nextInOrder = m1->nextInOrder;
+
+        if (m1->nextInOrder)
+            m1->nextInOrder->previousInOrder = m1->previousInOrder;
+        else
+            a->lastInOrder = m1->previousInOrder;
+
+        m1->nextInOrder = m2->nextInOrder;
+        m1->nextInOrder->previousInOrder = m1;
+
+        m1->previousInOrder = m2;
+        m2->nextInOrder= m1;
     }
+
+    printArchive(a);
+
+    return 1;
 }
 
 int writeArchive ( FILE* dest, archive_t* a )
@@ -675,6 +723,7 @@ void printArchive ( archive_t* a )
         printf("Membro %2ld: %s\n", m->order, m->name);
         printf("\tUID----------------: %d\n", m->UID);
         printf("\tPermissoes---------: %s\n", perm);
+        printf("\tPosicao------------: %ld\n", m->position);
         printf("\tTamanho------------: %ld bytes\n", m->size);
         printf("\tData de Modificacao: %s\n", date);
         printf("-/-/-/-/-/-/-/-/--/-/-/-/-/-/-/-/-/-/-/-/-/-/\n");
