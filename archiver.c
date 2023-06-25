@@ -481,6 +481,49 @@ int updateMember ( FILE* src, FILE* dest, char* srcName, archive_t* a )
     return 0;
 }
 
+int switchAdjacentMembers ( memberData_t* m1, memberData_t* m2 )
+{
+//    void* buffer = malloc(BUFFER_SIZE);
+//    if (! buffer)
+//        return 0;
+//
+//    if (m1->size == m2->size) {
+//        if (fseek(dest, m1->pos, SEEK_SET) == -1)
+//            return 0;
+//
+//        int timesRead = 0;
+//        long curPos = ftell(dest);
+//        if (curPos < 0) {
+//            free(buffer);
+//            return 0;
+//        }
+//
+//        while (curPos + (timesRead * BUFFER_SIZE) <= (m1->pos + m1->size)) {
+//            if (    (fread(buffer, BUFFER_SIZE, 1, dest) != 1)      || 
+//                    (fseek(dest, m2->pos + (timesRead * BUFFER_SIZE), SEEK_SET) == -1)   ||
+//                    (fwrite(buffer, BUFFER_SIZE, 1, dest) != 1)     ||
+//                    (fseek(dest, -bytes, SEEK_CUR) == -1)           ){
+//
+//                free(buffer);
+//                return 0;
+//            }
+//
+//            curPos = ftell(dest);
+//            if (curPos < 0) {
+//                free(buffer);
+//                return 0;
+//            }
+//
+//        }
+//
+//    } else if (m1->size > m2->size) {
+//
+//    } else {
+//
+//    }
+    return 0;
+}
+
 int writeArchive ( FILE* dest, archive_t* a )
 {
     if (fseek(dest, 0, SEEK_SET) == -1)

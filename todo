@@ -90,6 +90,4 @@ sobre a remocao:
     para a esquerda
 
 PROXIMOS PASSOS
-    truncar o arquivo ao final da escrita do archive
-    arrumar sequencia de fread/fseek/ftell
-    lixo
+    implementar -m
