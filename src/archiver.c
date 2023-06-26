@@ -47,8 +47,9 @@ memberData_t* allocateMember ( char* name )
         return NULL;
 
     short nameDiff = 2;
-    for (; (name[nameDiff] == '.') || (name[nameDiff] == '/'); nameDiff--);
-
+    for (short i = 0; (i < sizeofName) && ((name[i] == '.') || (name[i] == '/')); i++)
+        nameDiff--;
+    
     m->name = malloc(sizeof(char) * (sizeofName + nameDiff));
     if (! m->name) {
         free(m);
@@ -366,7 +367,6 @@ int insertMember ( FILE* src, FILE* dest, char* srcName, archive_t* a )
     long sizeDiff;
     treeNode_t* tn = treeSearch(a->memberTree, member);
 
-    printf("comparando membro %s\n", member->name);
     if (tn) {
         memberData_t* oldMember = tn->key;
         sizeDiff = s.st_size - oldMember->size;
@@ -606,11 +606,13 @@ memberData_t* getMember ( archive_t* a, char* name )
     if (! m)
         return NULL;
 
+    printf("buscando membro de nome %s\n", m->name);
     treeNode_t* tn = treeSearch(a->memberTree, m);
     freeMember(m);
 
     if (! tn)
         return NULL;
+    printf("encontrado membro de nome %s\n", tn->key->name);
     return tn->key;
 }
 
@@ -731,14 +733,48 @@ int removeMember ( FILE* dest, archive_t* a, char* m1Name )
     return 0;
 }
 
+int extractAllMembers ( FILE* src, archive_t* a )
+{
+    memberData_t* m = a->firstInOrder;
+    if (! m)
+        return 0;
+
+    int error;
+    FILE* dest;
+    while (m) {
+        dest = fopen(m->name, "w");
+        if (! dest) {
+            printf("falhou ao criar arquivo %s\n", m->name);
+            return 1;
+        }
+
+        error = extractMember(src, dest, m->name, a);
+        if (error) {
+            fclose(dest);
+            printf("falhou ao extrair arquivo %s\n", m->name);
+            return 1;
+        }
+
+        fclose(dest);
+        dest = NULL;
+        m = m->nextInOrder;
+    }
+
+    return 0;
+}
+
 int extractMember ( FILE* src, FILE* dest, char* name, archive_t* a )
 {
     memberData_t* m1 = getMember(a, name);
-    if (! m1)
+    if (! m1) {
+        printf("nao encontrou membro\n");
         return 1;
+    }
 
-    if (! pasteBinary(src, dest, m1->position, 0, m1->size))
+    if (! pasteBinary(src, dest, m1->position, 0, m1->size)) {
+        printf("nao colou binario no destino\n");
         return 1;
+    }
 
     return 0;
 }
@@ -752,7 +788,6 @@ int writeArchive ( FILE* dest, archive_t* a )
     if (fwrite(&pos, sizeof(int), 1, dest) != 1)
         return 1;
 
-    printArchive(a);
     return treeWriteBFS(dest, a->memberTree, a->numMembers, pos);
 }
 

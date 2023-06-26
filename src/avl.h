@@ -45,8 +45,6 @@ int treeRemove ( treeNode_t** root, memberData_t* chave );
 //retorna NULL se não existe
 treeNode_t* treeSearch ( treeNode_t* node, memberData_t* chave );
 
-void treePrintDFS ( treeNode_t* node );
-
 int treeWriteBFS( FILE* dest, treeNode_t* root, long numNodes, int start );
 
 //retorna NULL e desaloca a memoria da arvore

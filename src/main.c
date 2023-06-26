@@ -388,6 +388,16 @@ void extractMembers ( int argc, char** argv,
     }
 
     int error;
+    if (argc == 3) {
+        error = extractAllMembers(arq, archive);
+        if (error) {
+            fprintf(stderr, "%d Erro ao extrair membro do archive\n", error);
+            freeArchive(archive);
+            fclose(arq);
+            exit(1);
+        }
+    }
+
     FILE* dest;
     for (unsigned int index = optind+1; index < argc; index++) {
         dest = fopen(argv[index], "w");

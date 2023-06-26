@@ -5,9 +5,6 @@
 #include "avl.h"
 #include "fila.h"
 
-// verificar se eh a implementacao certo
-// prints estranhos e erro que nao tinha sido arrumado em rotacao
-
 int memberLessThan ( memberData_t* m1, memberData_t* m2 )
 {
     unsigned int i = 0;
@@ -297,7 +294,6 @@ treeNode_t* treeInsert ( treeNode_t** root, memberData_t* key ) {
             atual = atual->rightSon;
         } else {
             free(n);
-            printf("membro %s eh igual a %s e ja esta na arvore\n", key->name, atual->key->name);
             return NULL;
         }
     }
@@ -484,15 +480,6 @@ treeNode_t* treeSearch ( treeNode_t* nodo, memberData_t* key ) {
     if (memberLessThan(key, nodo->key))
         return treeSearch(nodo->leftSon, key);
     return treeSearch(nodo->rightSon, key);
-}
-
-void treePrintDFS ( treeNode_t* root ) {
-    if (! root)
-        return;
-
-    treePrintDFS(root->leftSon);
-    //printf("%d ", root->key); 
-    treePrintDFS(root->rightSon);
 }
 
 // Calcula e retorna a height do nodo apontado por n
