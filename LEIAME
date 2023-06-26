@@ -1,0 +1,63 @@
+Autor:
+    Marcelo Eduardo Marques Ribas
+    GRR20221258
+
+Arquivos:
+    archiver.c
+        Contém a implementação da bilioteca archiver, com as funções que
+        manipulam a estrutura de dados archive_t, desde a sua criação até
+        a destruição.
+
+    archiver.h
+        Protótipo da estrutura archive_t e as funções para manipular a
+        estrutura.
+
+    avl.c
+        Contém a implementação de uma árvore avl, de nome treeNode_t,
+        usada para organizar os membros do archive.
+
+    avl.h
+        Protótipo da estrutura treeNode_t e as funções para manipular a
+        estrutura.
+
+    fila.c
+        Contém a implementação de uma fila, utilizada somente pela avl.
+
+    fila.h
+        Protótipo da estrutura fila e suas funções;
+
+    main.c
+        Arquivo principal do programa, utiliza as funções da biblioteca
+        archiver para manipular os arquivos apontados na linha de comando.
+
+Estruturas de Dados:
+    A estrutura de dados escolhida é uma mistura de árvore com lista ligada.
+    Essa escolha ocorreu depois de muito ponderar sobre um jeito eficiented e
+    percorrer a estrutura para encontrar facilmente tanto os nodos na ordem que
+    se encontram no archive quanto um nodo qualquer dado seu nome. A estrutura
+    então contém o ponteiro para um nodo de uma árvore avl (a raíz) e dois
+    ponteiros para a estrutura que é a chave dos nodos da árvore, que é a
+    estrutura que efetivamente contém os dados de cada membro e se chama
+    memberData_t. Esses dois ponteiros são para o primeiro e último membros
+    da árvore, e os próprios memberData_t contém ponteiros para os seus
+    membros adjacentes. Dessa forma é eficiente verificar a existencia de
+    qualquer membro na estrutura, pois estão armazenados e uma avl, e é
+    eficiente percorrer os membros na ordem, pois estão sempre ordenados.
+    O custo disso é um leve aumento no custo de inserção, mas uma vez
+    inseridos, tudo fica mais eficiente.
+
+    Na hora de salvar os dados da estrutura para encerrar a exeucação do
+    programa, a árvore com os dados é percorrida em BFS, de forma que na hora
+    que os dados forem lidos na próxima execução, serão inseridos na sua
+    posição exata, não demandando ajustes ou rotações na árvore, o que
+    abate um pouco do custo adicional de inserir os dados ao mesmo tempo
+    em uma lista ligada.
+
+    Muitos algoritmos são reutilizações de outros já implementados. O
+    algoritmo que executa a função da opção -a funciona de maneira
+    idêntica ao da opção -i, e o mesmo ocorre com as opções -m e -r.
+    As movimentação de dados binários ocorrem respeitando o buffer de
+    1024 bytes, e antes de todas as operações que modificam o archive é
+    criado um backup temporário até que as operações tenham sido
+    realizadas. O temporário é então removido, caso nenhum erro ocorra.
+    Caso ocorra erro ele substituirá o arquivo que estava sendo editado.

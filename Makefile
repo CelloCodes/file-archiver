@@ -4,8 +4,6 @@ COMPILER=gcc
 
 PARAMS=-Wall
 
-EXECS=teste main
-
 DIR=src
 
 OBJECTS=$(DIR)/main.o $(DIR)/archiver.o $(DIR)/avl.o $(DIR)/fila.o
@@ -32,4 +30,4 @@ archiver.o: $(DIR)/archiver.h $(DIR)/archiver.c
 	$(COMPILER) $(PARAMS) -c $(DIR)/archiver.c
 
 clean:
-	rm -f $(DIR)/$(OBJECTS) $(EXECS)
+	rm -f $(OBJECTS) $(PROGRAM_NAME)
