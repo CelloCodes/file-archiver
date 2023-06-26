@@ -508,5 +508,13 @@ void listMembers( int argc, char** argv,
 
 void help ( )
 {
-    return;
+    printf("Meio de uso: vina++ <opção> <archive> [membro1 membro2 ...]\n");
+    printf("Opções:\n");
+    printf("\t-i: Inserir membros. Caso já existam são sobrescritos\n");
+    printf("\t-a: inserir membros. Caso já existam são sobrescritos se tiverem sido alterados\n");
+    printf("\t-m: target: Move o membro target para depois do membro passado como parâmetro\n");
+    printf("\t-x: Extrair membros. Se nenhum parâmetro for passado extrai todos\n");
+    printf("\t-r: Remover membros\n");
+    printf("\t-c: Listar membros\n");
+    printf("\t-h: Comando de ajuda\n");
 }

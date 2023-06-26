@@ -5,6 +5,7 @@
 #include <limits.h>
 #include <time.h>
 #include <errno.h>
+#include <string.h>
 
 #include "archiver.h"
 
@@ -606,13 +607,11 @@ memberData_t* getMember ( archive_t* a, char* name )
     if (! m)
         return NULL;
 
-    printf("buscando membro de nome %s\n", m->name);
     treeNode_t* tn = treeSearch(a->memberTree, m);
     freeMember(m);
 
     if (! tn)
         return NULL;
-    printf("encontrado membro de nome %s\n", tn->key->name);
     return tn->key;
 }
 
@@ -733,6 +732,31 @@ int removeMember ( FILE* dest, archive_t* a, char* m1Name )
     return 0;
 }
 
+int createDirectoryHierarchy ( short strLen, char* path )
+{
+    char dirs[strLen];
+
+    short lastEnd = 0;
+    short j = 0;
+    for (int i = 2; i < strLen; i++) {
+        if(path[i] == '/') {
+            dirs[i+1] = '\0';
+            for(j = i; j >= lastEnd; j--){
+                dirs[j] = path[j];
+            }
+            if (mkdir(dirs, S_IRWXU)) {
+                if (errno != EEXIST) {
+                    fprintf(stderr, "Falha ao criar arvore de diretorios %s\n", path);
+                    return 0;
+                }
+            }
+            lastEnd = i;
+        }
+    }
+
+    return 1;
+}
+
 int extractAllMembers ( FILE* src, archive_t* a )
 {
     memberData_t* m = a->firstInOrder;
@@ -742,16 +766,19 @@ int extractAllMembers ( FILE* src, archive_t* a )
     int error;
     FILE* dest;
     while (m) {
+        if (! createDirectoryHierarchy (m->sizeofName, m->name))
+            return 1;
+
         dest = fopen(m->name, "w");
         if (! dest) {
-            printf("falhou ao criar arquivo %s\n", m->name);
+            fprintf(stderr, "Falhou ao criar arquivo %s\n", m->name);
             return 1;
         }
 
         error = extractMember(src, dest, m->name, a);
         if (error) {
             fclose(dest);
-            printf("falhou ao extrair arquivo %s\n", m->name);
+            fprintf(stderr, "Falhou ao extrair arquivo %s\n", m->name);
             return 1;
         }
 
